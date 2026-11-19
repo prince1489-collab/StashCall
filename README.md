@@ -13,6 +13,10 @@ npm test            # timeline and time-zone tests
 npm run typecheck
 ```
 
+## Builds for testers
+
+See [BUILDING.md](BUILDING.md).
+
 ## How it is organised
 
 | Path | What it holds |
