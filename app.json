@@ -18,7 +18,10 @@
         "monochromeImage": "./assets/android-icon-monochrome.png"
       },
       "predictiveBackGestureEnabled": false,
-      "package": "com.stashcall.app"
+      "package": "com.stashcall.app",
+      "permissions": [
+        "android.permission.SCHEDULE_EXACT_ALARM"
+      ]
     },
     "web": {
       "favicon": "./assets/favicon.png"
@@ -34,7 +37,8 @@
           "cameraPermission": "StashCall uses the camera so you can photograph items you tend to forget. Photos stay on your phone.",
           "microphonePermission": false
         }
-      ]
+      ],
+      "expo-notifications"
     ]
   }
 }

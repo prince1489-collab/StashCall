@@ -5,6 +5,7 @@ import { buildTimeline } from '../../domain/timeline';
 import { stepItemNames } from '../../domain/tripItems';
 import { useAppData } from '../../state/AppData';
 import { PrimaryButton } from '../../ui/Form';
+import { ReminderStatus } from '../../ui/ReminderStatus';
 import { Timeline } from '../../ui/Timeline';
 import { colors, space } from '../../ui/theme';
 
@@ -45,6 +46,7 @@ export default function Today() {
       ) : (
         <Text style={styles.emptyText}>This trip is over. Add your next one from the Trip tab.</Text>
       )}
+      <ReminderStatus />
       {upcoming.length > 1 ? (
         <>
           <Text style={styles.section}>Coming up</Text>

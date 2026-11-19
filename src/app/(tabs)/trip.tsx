@@ -5,6 +5,7 @@ import { buildTimeline } from '../../domain/timeline';
 import { stepItemNames } from '../../domain/tripItems';
 import { useAppData } from '../../state/AppData';
 import { PrimaryButton } from '../../ui/Form';
+import { ReminderStatus } from '../../ui/ReminderStatus';
 import { Timeline } from '../../ui/Timeline';
 import { colors, space } from '../../ui/theme';
 
@@ -36,6 +37,7 @@ export default function TripScreen() {
       <Text style={styles.note}>
         Estimates are worked out from your flight or checkout time. Tap Edit to change any assumption.
       </Text>
+      <ReminderStatus />
       <Timeline steps={steps} itemsFor={(s) => stepItemNames(currentTrip, data.items, s)} />
     </ScrollView>
   );
