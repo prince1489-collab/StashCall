@@ -172,6 +172,7 @@ export default function EditTrip() {
             <DateTimeRow label="Checkout" value={checkout.checkout} onChange={(v) => setC({ checkout: v })} />
             <ZoneRow
               label="Hotel time zone"
+              hint="Where the hotel is, not where you are now"
               value={checkout.timeZone}
               onChange={(timeZone) => setC({ timeZone })}
             />
