@@ -108,6 +108,19 @@ describe('clock changes', () => {
     expect(instantToZoned(ny, 'America/New_York')).toBe('2026-03-08T03:30');
     const ldn = zonedToInstant('2026-03-29T01:30', 'Europe/London');
     expect(instantToZoned(ldn, 'Europe/London')).toBe('2026-03-29T02:30');
+    const akl = zonedToInstant('2026-09-27T02:30', 'Pacific/Auckland');
+    expect(instantToZoned(akl, 'Pacific/Auckland')).toBe('2026-09-27T03:30');
+  });
+
+  it('handles far-east and far-west zones on ordinary days', () => {
+    for (const [local, zone] of [
+      ['2026-09-27T01:30', 'Pacific/Auckland'],
+      ['2026-09-27T04:00', 'Pacific/Auckland'],
+      ['2026-06-01T09:00', 'Pacific/Kiritimati'],
+      ['2026-06-01T09:00', 'Pacific/Pago_Pago'],
+    ]) {
+      expect(instantToZoned(zonedToInstant(local, zone), zone)).toBe(local);
+    }
   });
 
   it('uses the first occurrence of a time repeated when clocks go back', () => {
