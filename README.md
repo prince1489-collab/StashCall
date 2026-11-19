@@ -24,6 +24,7 @@ npm run typecheck
 | `src/domain/timeline.ts` | Works the day out backwards from departure and checkout times |
 | `src/domain/time.ts` | Time-zone conversion for wall-clock times |
 | `src/domain/household.ts` | Adding, editing and removing saved items and owners |
+| `src/reminders/` | Turns the timeline into phone notifications and keeps them in sync |
 | `src/storage/photos.ts` | Optional item photos, kept on the phone only |
 | `src/domain/presets.ts` | The 10 preloaded high-regret items |
 | `src/storage/store.ts` | On-device storage (AsyncStorage) |
@@ -42,6 +43,10 @@ From a flight departure, using defaults the user can change per trip:
 | Sweep the room | hotel checkout minus sweep time, in the hotel's time zone | 60 min |
 
 Only times the user typed (departure, checkout) are shown as confirmed. Everything else is labelled as an estimate.
+
+## Reminders
+
+Five local notifications per trip, scheduled on the phone (no server): pack the evening before, wake up, last item check, leave home, and sweep the room before checkout. Each lists the items it covers. They are rebuilt whenever a trip or item changes and whenever the app is opened. On Android, wake-up and leave-home use alarm-clock delivery so the system doesn't delay them; this needs the "Alarms and reminders" permission, which the app asks for.
 
 ## Out of scope for phase 1
 

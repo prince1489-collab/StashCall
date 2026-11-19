@@ -6,6 +6,7 @@ import { DEFAULTS } from '../../domain/defaults';
 import { buildTimeline, defaultFlight } from '../../domain/timeline';
 import type { FlightLeg, HotelCheckout, Trip } from '../../domain/types';
 import { newId } from '../../storage/store';
+import { useReminders } from '../../reminders/Reminders';
 import { useAppData } from '../../state/AppData';
 import {
   DateTimeRow,
@@ -40,6 +41,7 @@ function newCheckout(): HotelCheckout {
 
 export default function EditTrip() {
   const { data, currentTrip, saveTrip, deleteTrip } = useAppData();
+  const { askPermission } = useReminders();
   const existing = currentTrip;
 
   const [name, setName] = useState(existing?.name ?? '');
@@ -84,6 +86,8 @@ export default function EditTrip() {
       createdAt: existing?.createdAt ?? new Date().toISOString(),
     };
     await saveTrip(trip);
+    // Ask at the moment it obviously matters: right after planning a trip.
+    await askPermission();
     router.back();
   };
 
