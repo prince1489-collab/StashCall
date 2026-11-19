@@ -1,11 +1,12 @@
 import { router, useLocalSearchParams } from 'expo-router';
-import { useState } from 'react';
-import { Alert, Pressable, ScrollView, StyleSheet, Text, TextInput, View } from 'react-native';
+import { useRef, useState } from 'react';
+import { Alert, Pressable, ScrollView, StyleSheet, Text, TextInput, View, type ScrollViewInstance } from 'react-native';
 
 import { ensureOwner, removeItem, upsertItem } from '../../domain/household';
 import type { Item, ItemMoment } from '../../domain/types';
 import { deletePhoto, takeItemPhoto } from '../../storage/photos';
 import { newId } from '../../storage/store';
+import { useKeyboardInset } from '../../hooks/useKeyboardInset';
 import { useAppData } from '../../state/AppData';
 import { PrimaryButton, Row, Section } from '../../ui/Form';
 import { ItemThumb, MOMENT_LABEL } from '../../ui/ItemRow';
@@ -23,6 +24,10 @@ export default function EditItem() {
   const [ownerName, setOwnerName] = useState(data.owners.find((o) => o.id === existing?.ownerId)?.name ?? '');
   const [note, setNote] = useState(existing?.note ?? '');
   const [photoUri, setPhotoUri] = useState(existing?.photoUri);
+  const scroll = useRef<ScrollViewInstance>(null);
+  const keyboard = useKeyboardInset();
+  // The note sits near the bottom: bring it above the keyboard once it opens.
+  const showNote = () => setTimeout(() => scroll.current?.scrollToEnd({ animated: true }), 300);
 
   const addPhoto = async (source: 'camera' | 'library') => {
     const uri = await takeItemPhoto(source);
@@ -73,19 +78,25 @@ export default function EditItem() {
   const preview: Item = { id: 'preview', name: name || '?', moment, photoUri, createdAt: '' };
 
   return (
-    <ScrollView contentContainerStyle={styles.container} keyboardShouldPersistTaps="handled">
-      <Section>
-        <Row label="Item">
-          <TextInput
-            value={name}
-            onChangeText={setName}
-            placeholder="Lens kit"
-            placeholderTextColor={colors.muted}
-            style={styles.input}
-            accessibilityLabel="Item name"
-            autoFocus={!existing}
-          />
-        </Row>
+    <ScrollView
+      ref={scroll}
+      contentContainerStyle={[styles.container, { paddingBottom: 48 + keyboard }]}
+      keyboardShouldPersistTaps="handled"
+      automaticallyAdjustKeyboardInsets
+    >
+      <Section title="Item">
+        <TextInput
+          value={name}
+          onChangeText={setName}
+          placeholder="Lens kit"
+          placeholderTextColor={colors.muted}
+          style={[styles.input, styles.name]}
+          accessibilityLabel="Item name"
+          autoFocus={!existing}
+          multiline
+          submitBehavior="blurAndSubmit"
+          returnKeyType="done"
+        />
       </Section>
 
       <Section title="Remind me">
@@ -158,6 +169,7 @@ export default function EditItem() {
           style={[styles.input, styles.note]}
           multiline
           accessibilityLabel="Note"
+          onFocus={showNote}
         />
       </Section>
 
@@ -174,7 +186,8 @@ export default function EditItem() {
 const styles = StyleSheet.create({
   container: { padding: space.l, paddingBottom: 48 },
   input: { flex: 1, fontSize: 16, color: colors.text, textAlign: 'right' },
-  note: { textAlign: 'left', padding: space.l, minHeight: 72 },
+  name: { textAlign: 'left', paddingHorizontal: space.l, paddingVertical: 14 },
+  note: { textAlign: 'left', padding: space.l, minHeight: 72, textAlignVertical: 'top' },
   option: {
     flexDirection: 'row',
     justifyContent: 'space-between',
