@@ -2,9 +2,13 @@
 
 Builds run on Expo's servers (EAS). You start them from your own computer once per platform, because Apple and Google sign-in and signing keys are set up interactively the first time.
 
+## No Node.js on your computer? Use Codespaces
+
+On the repo page click **Code**, then **Codespaces**, then **Create codespace on main**. You get a browser-based editor with a terminal and Node.js already installed. Run every command below in that terminal, skipping the clone step. When you're done, run `git commit -am "Link Expo project" && git push` to save the project ID that `init` adds.
+
 ## One-time setup
 
-1. Install Node.js 20 or newer.
+1. Install Node.js 20 or newer (not needed in Codespaces).
 2. Clone the repo and install:
    ```bash
    git clone https://github.com/prince1489-collab/StashCall.git
