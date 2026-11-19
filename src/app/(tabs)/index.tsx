@@ -2,12 +2,13 @@ import { router } from 'expo-router';
 import { ScrollView, StyleSheet, Text, View } from 'react-native';
 
 import { openChecklistStep, toggleTick } from '../../domain/checklist';
+import { instantToZoned } from '../../domain/time';
 import { buildTimeline } from '../../domain/timeline';
 import { stepItemNames, stepItems } from '../../domain/tripItems';
 import { useNow } from '../../hooks/useNow';
 import { useAppData } from '../../state/AppData';
 import { Checklist } from '../../ui/Checklist';
-import { PrimaryButton } from '../../ui/Form';
+import { PrimaryButton, formatLocalDate } from '../../ui/Form';
 import { ReminderStatus } from '../../ui/ReminderStatus';
 import { Timeline } from '../../ui/Timeline';
 import { colors, space } from '../../ui/theme';
@@ -55,6 +56,7 @@ export default function Today() {
           <Text style={styles.nextLabel}>Next</Text>
           <Text style={styles.nextTitle}>{next.title}</Text>
           <Text style={styles.nextTime}>{next.localTime}</Text>
+          <Text style={styles.nextDay}>{formatLocalDate(instantToZoned(next.at, next.timeZone))}</Text>
           {stepItemNames(currentTrip, data.items, next).length > 0 ? (
             <Text style={styles.nextItems}>{stepItemNames(currentTrip, data.items, next).join(' · ')}</Text>
           ) : null}
@@ -80,6 +82,7 @@ const styles = StyleSheet.create({
   nextLabel: { color: '#CFE7DF', fontSize: 13, fontWeight: '600', textTransform: 'uppercase' },
   nextTitle: { color: '#fff', fontSize: 22, fontWeight: '700', marginTop: space.xs },
   nextTime: { color: '#fff', fontSize: 40, fontWeight: '700', marginTop: space.s, fontVariant: ['tabular-nums'] },
+  nextDay: { color: '#fff', fontSize: 15, opacity: 0.85 },
   nextItems: { color: '#fff', fontSize: 16, marginTop: space.m, lineHeight: 22 },
   section: { fontSize: 13, fontWeight: '600', color: colors.muted, textTransform: 'uppercase', marginTop: space.xl },
   empty: { flex: 1, justifyContent: 'center', padding: space.xl, gap: space.l },
