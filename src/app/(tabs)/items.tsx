@@ -30,6 +30,13 @@ export default function Items() {
     setShowPresets(false);
   };
 
+  // Close the list first, so saving the new item lands back on "Your items".
+  // Keep it open if something is ticked, so those picks aren't lost.
+  const addSomethingElse = () => {
+    if (picked.length === 0) setShowPresets(false);
+    router.push('/item/edit');
+  };
+
   const onTrip = new Set(currentTrip?.itemIds ?? []);
   const ownerOf = (id?: string) => data.owners.find((o) => o.id === id);
 
@@ -64,7 +71,7 @@ export default function Items() {
             onPress={addPicked}
             disabled={picked.length === 0}
           />
-          <Text style={styles.link} onPress={() => router.push('/item/edit')} accessibilityRole="button">
+          <Text style={styles.link} onPress={addSomethingElse} accessibilityRole="button">
             Add something else
           </Text>
           {!firstRun ? (
