@@ -12,7 +12,6 @@ import {
   DateTimeRow,
   MinutesStepper,
   PrimaryButton,
-  Row,
   Section,
   SwitchRow,
   TimeRow,
@@ -110,18 +109,18 @@ export default function EditTrip() {
 
   return (
     <ScrollView contentContainerStyle={styles.container} keyboardShouldPersistTaps="handled">
-      <Section>
-        <Row label="Trip name">
-          <TextInput
-            value={name}
-            onChangeText={setName}
-            placeholder="Milan in December"
-            placeholderTextColor={colors.muted}
-            style={styles.input}
-            accessibilityLabel="Trip name"
-            returnKeyType="done"
-          />
-        </Row>
+      <Section title="Trip name">
+        <TextInput
+          value={name}
+          onChangeText={setName}
+          placeholder="Milan in December"
+          placeholderTextColor={colors.muted}
+          style={[styles.input, styles.name]}
+          accessibilityLabel="Trip name"
+          multiline
+          submitBehavior="blurAndSubmit"
+          returnKeyType="done"
+        />
       </Section>
 
       <Section title="Flight">
@@ -209,6 +208,7 @@ export default function EditTrip() {
 const styles = StyleSheet.create({
   container: { padding: space.l, paddingBottom: 48 },
   input: { flex: 1, fontSize: 16, color: colors.text, textAlign: 'right' },
+  name: { textAlign: 'left', paddingHorizontal: space.l, paddingVertical: 14 },
   warn: { color: colors.warn, marginBottom: space.s },
   delete: { color: colors.danger, textAlign: 'center', fontSize: 16, marginTop: space.xl, padding: space.s },
 });
