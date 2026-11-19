@@ -38,9 +38,12 @@ export function zoneOffsetMinutes(at: Date, timeZone: string): number {
 export function zonedToInstant(local: LocalDateTime, timeZone: string): Date {
   const { y, mo, d, h, mi } = parseLocal(local);
   const naive = Date.UTC(y, mo - 1, d, h, mi);
-  const halfDay = 12 * 60 * 60000;
-  const offBefore = zoneOffsetMinutes(new Date(naive - halfDay), timeZone);
-  const offAfter = zoneOffsetMinutes(new Date(naive + halfDay), timeZone);
+  // Real offsets run from -12 h to +14 h, so sampling 36 h either side of
+  // the naive instant is always before and after any clock change near it.
+  // Changes are months apart, so no second change falls inside the window.
+  const window = 36 * 60 * 60000;
+  const offBefore = zoneOffsetMinutes(new Date(naive - window), timeZone);
+  const offAfter = zoneOffsetMinutes(new Date(naive + window), timeZone);
 
   const candidates = [naive - offBefore * 60000, naive - offAfter * 60000]
     .filter((t) => instantToZoned(new Date(t), timeZone) === local)

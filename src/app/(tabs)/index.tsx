@@ -1,16 +1,20 @@
 import { router } from 'expo-router';
 import { ScrollView, StyleSheet, Text, View } from 'react-native';
 
+import { openChecklistStep, toggleTick } from '../../domain/checklist';
 import { buildTimeline } from '../../domain/timeline';
-import { stepItemNames } from '../../domain/tripItems';
+import { stepItemNames, stepItems } from '../../domain/tripItems';
+import { useNow } from '../../hooks/useNow';
 import { useAppData } from '../../state/AppData';
+import { Checklist } from '../../ui/Checklist';
 import { PrimaryButton } from '../../ui/Form';
 import { ReminderStatus } from '../../ui/ReminderStatus';
 import { Timeline } from '../../ui/Timeline';
 import { colors, space } from '../../ui/theme';
 
 export default function Today() {
-  const { data, currentTrip, ready } = useAppData();
+  const { data, currentTrip, ready, update } = useAppData();
+  const now = useNow();
   if (!ready) return null;
 
   if (!currentTrip) {
@@ -27,13 +31,25 @@ export default function Today() {
     );
   }
 
-  const now = new Date();
-  const upcoming = buildTimeline(currentTrip).filter((s) => s.at.getTime() >= now.getTime());
+  const steps = buildTimeline(currentTrip);
+  const upcoming = steps.filter((s) => s.at.getTime() >= now.getTime());
+  const open = openChecklistStep(steps, now);
+  const openItems = open ? stepItems(currentTrip, data.items, open) : [];
+  const trip = currentTrip;
   const next = upcoming[0];
 
   return (
     <ScrollView contentContainerStyle={styles.container}>
       <Text style={styles.tripName}>{currentTrip.name}</Text>
+      {open && openItems.length > 0 ? (
+        <Checklist
+          title={open.title}
+          items={openItems}
+          owners={data.owners}
+          done={trip.ticked[open.kind] ?? []}
+          onToggle={(itemId) => update((d) => toggleTick(d, trip.id, open.kind, itemId))}
+        />
+      ) : null}
       {next ? (
         <View style={styles.nextCard}>
           <Text style={styles.nextLabel}>Next</Text>

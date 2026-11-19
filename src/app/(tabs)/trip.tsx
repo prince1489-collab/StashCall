@@ -3,6 +3,7 @@ import { ScrollView, StyleSheet, Text, View } from 'react-native';
 
 import { buildTimeline } from '../../domain/timeline';
 import { stepItemNames } from '../../domain/tripItems';
+import { useNow } from '../../hooks/useNow';
 import { useAppData } from '../../state/AppData';
 import { PrimaryButton } from '../../ui/Form';
 import { ReminderStatus } from '../../ui/ReminderStatus';
@@ -11,6 +12,7 @@ import { colors, space } from '../../ui/theme';
 
 export default function TripScreen() {
   const { data, currentTrip, ready } = useAppData();
+  const now = useNow();
   if (!ready) return null;
 
   if (!currentTrip) {
@@ -38,7 +40,7 @@ export default function TripScreen() {
         Estimates are worked out from your flight or checkout time. Tap Edit to change any assumption.
       </Text>
       <ReminderStatus />
-      <Timeline steps={steps} itemsFor={(s) => stepItemNames(currentTrip, data.items, s)} />
+      <Timeline steps={steps} now={now} itemsFor={(s) => stepItemNames(currentTrip, data.items, s)} />
     </ScrollView>
   );
 }

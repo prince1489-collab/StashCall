@@ -1,5 +1,5 @@
-import { Tabs } from 'expo-router';
-import { View } from 'react-native';
+import { Tabs, router } from 'expo-router';
+import { Text, View } from 'react-native';
 import type { ColorValue } from 'react-native';
 
 import { colors } from '../../ui/theme';
@@ -17,6 +17,15 @@ export default function TabsLayout() {
         tabBarInactiveTintColor: colors.muted,
         tabBarIcon: dot,
         sceneStyle: { backgroundColor: colors.bg },
+        headerRight: () => (
+          <Text
+            onPress={() => router.push('/settings')}
+            style={{ color: colors.accent, fontSize: 16, fontWeight: '600', paddingHorizontal: 16 }}
+            accessibilityRole="button"
+          >
+            Settings
+          </Text>
+        ),
       }}
     >
       <Tabs.Screen name="index" options={{ title: 'Today' }} />
