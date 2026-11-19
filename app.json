@@ -26,7 +26,15 @@
     "scheme": "stashcall",
     "plugins": [
       "expo-router",
-      "@react-native-community/datetimepicker"
+      "@react-native-community/datetimepicker",
+      [
+        "expo-image-picker",
+        {
+          "photosPermission": "StashCall uses your photos so you can show which item you mean, like your own lens case or charger. Photos stay on your phone.",
+          "cameraPermission": "StashCall uses the camera so you can photograph items you tend to forget. Photos stay on your phone.",
+          "microphonePermission": false
+        }
+      ]
     ]
   }
 }

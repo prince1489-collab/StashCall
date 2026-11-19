@@ -6,7 +6,16 @@ import { formatLocalDate, zoneLabel } from './Form';
 import { colors, space } from './theme';
 
 /** A vertical list of timeline steps, grouped by day. */
-export function Timeline({ steps, now = new Date() }: { steps: TimelineStep[]; now?: Date }) {
+export function Timeline({
+  steps,
+  now = new Date(),
+  itemsFor,
+}: {
+  steps: TimelineStep[];
+  now?: Date;
+  /** Names of the items a reminder step covers. */
+  itemsFor?: (step: TimelineStep) => string[];
+}) {
   let lastDay = '';
   const zones = new Set(steps.map((s) => s.timeZone));
   return (
@@ -17,6 +26,7 @@ export function Timeline({ steps, now = new Date() }: { steps: TimelineStep[]; n
         const header = day !== lastDay ? formatLocalDate(local) : null;
         lastDay = day;
         const past = s.at.getTime() < now.getTime();
+        const items = itemsFor?.(s) ?? [];
         return (
           <View key={`${s.kind}-${i}`}>
             {header ? <Text style={styles.day}>{header}</Text> : null}
@@ -29,6 +39,7 @@ export function Timeline({ steps, now = new Date() }: { steps: TimelineStep[]; n
                   {zones.size > 1 ? ` · ${zoneLabel(s.timeZone)} time` : ''}
                   {s.notify ? ' · Reminder' : ''}
                 </Text>
+                {items.length > 0 ? <Text style={styles.items}>{items.join(' · ')}</Text> : null}
               </View>
             </View>
           </View>
@@ -54,4 +65,5 @@ const styles = StyleSheet.create({
   body: { flex: 1 },
   title: { fontSize: 16, color: colors.text },
   meta: { fontSize: 13, color: colors.muted, marginTop: 2 },
+  items: { fontSize: 14, color: colors.accent, marginTop: space.xs, lineHeight: 20 },
 });

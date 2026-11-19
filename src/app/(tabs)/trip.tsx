@@ -2,13 +2,14 @@ import { Link, router } from 'expo-router';
 import { ScrollView, StyleSheet, Text, View } from 'react-native';
 
 import { buildTimeline } from '../../domain/timeline';
+import { stepItemNames } from '../../domain/tripItems';
 import { useAppData } from '../../state/AppData';
 import { PrimaryButton } from '../../ui/Form';
 import { Timeline } from '../../ui/Timeline';
 import { colors, space } from '../../ui/theme';
 
 export default function TripScreen() {
-  const { currentTrip, ready } = useAppData();
+  const { data, currentTrip, ready } = useAppData();
   if (!ready) return null;
 
   if (!currentTrip) {
@@ -35,7 +36,7 @@ export default function TripScreen() {
       <Text style={styles.note}>
         Estimates are worked out from your flight or checkout time. Tap Edit to change any assumption.
       </Text>
-      <Timeline steps={steps} />
+      <Timeline steps={steps} itemsFor={(s) => stepItemNames(currentTrip, data.items, s)} />
     </ScrollView>
   );
 }
