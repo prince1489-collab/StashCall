@@ -1,9 +1,10 @@
-import { createContext, useCallback, useContext, useEffect, useMemo, useState } from 'react';
+import { createContext, useCallback, useContext, useEffect, useMemo, useRef, useState } from 'react';
 import type { ReactNode } from 'react';
 import { AppState } from 'react-native';
 
 import { useAppData } from '../state/AppData';
 import { planReminders } from './plan';
+import { latestOnly } from './serial';
 import type { PermissionState } from './schedule';
 import { getPermission, hasExactAlarms, requestExactAlarms, requestPermission, syncReminders } from './schedule';
 
@@ -31,13 +32,21 @@ export function RemindersProvider({ children }: { children: ReactNode }) {
   const [scheduled, setScheduled] = useState(0);
   const [tick, setTick] = useState(0);
 
-  const sync = useCallback(async () => {
-    const [perm, ex] = await Promise.all([getPermission(), hasExactAlarms()]);
-    setPermission(perm);
-    setExact(ex);
-    const plan = currentTrip ? planReminders(currentTrip, data.items, new Date()) : [];
-    setScheduled(await syncReminders(plan));
-  }, [currentTrip, data.items]);
+  // One sync at a time, and only the newest: an older sync finishing late
+  // must never re-schedule reminders a newer one has cancelled.
+  const queue = useRef(latestOnly<void>()).current;
+
+  const sync = useCallback(
+    () =>
+      queue(async () => {
+        const [perm, ex] = await Promise.all([getPermission(), hasExactAlarms()]);
+        setPermission(perm);
+        setExact(ex);
+        const plan = currentTrip ? planReminders(currentTrip, data.items, new Date()) : [];
+        setScheduled(await syncReminders(plan));
+      }),
+    [queue, currentTrip, data.items],
+  );
 
   useEffect(() => {
     if (!ready) return;
