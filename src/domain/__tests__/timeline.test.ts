@@ -101,3 +101,22 @@ describe('itemsForMoment', () => {
     expect(itemsForMoment(items, 'checkout').map((i) => i.id)).toEqual(['charger', 'robe']);
   });
 });
+
+describe('clock changes', () => {
+  it('moves a time inside a spring-forward gap forward, in every zone', () => {
+    const ny = zonedToInstant('2026-03-08T02:30', 'America/New_York');
+    expect(instantToZoned(ny, 'America/New_York')).toBe('2026-03-08T03:30');
+    const ldn = zonedToInstant('2026-03-29T01:30', 'Europe/London');
+    expect(instantToZoned(ldn, 'Europe/London')).toBe('2026-03-29T02:30');
+  });
+
+  it('uses the first occurrence of a time repeated when clocks go back', () => {
+    const t = zonedToInstant('2026-10-25T01:30', 'Europe/London');
+    expect(t.toISOString()).toBe('2026-10-25T00:30:00.000Z');
+  });
+
+  it('handles times next to a change normally', () => {
+    const t = zonedToInstant('2026-03-29T03:00', 'Europe/London');
+    expect(t.toISOString()).toBe('2026-03-29T02:00:00.000Z');
+  });
+});

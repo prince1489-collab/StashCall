@@ -17,6 +17,9 @@ npm run typecheck
 
 | Path | What it holds |
 | --- | --- |
+| `src/app/` | Screens (Expo Router): Today, Trip and Items tabs, and the trip form |
+| `src/state/AppData.tsx` | App-wide data, loaded from and saved to the device |
+| `src/ui/` | Shared form controls, timeline view and colours |
 | `src/domain/types.ts` | Data model: Trip, FlightLeg, HotelCheckout, Item, Owner, TimelineStep |
 | `src/domain/timeline.ts` | Works the day out backwards from departure and checkout times |
 | `src/domain/time.ts` | Time-zone conversion for wall-clock times |

@@ -29,15 +29,27 @@ export function zoneOffsetMinutes(at: Date, timeZone: string): number {
 
 /**
  * The instant at which the wall clock in `timeZone` reads `local`.
- * For times skipped by a DST jump, returns the instant just after the gap.
+ *
+ * Around clock changes:
+ * - a time that happens twice (clocks go back) resolves to the first one;
+ * - a time that never happens (clocks go forward) moves forward by the size
+ *   of the gap, e.g. 02:30 on a spring-forward night becomes 03:30.
  */
 export function zonedToInstant(local: LocalDateTime, timeZone: string): Date {
   const { y, mo, d, h, mi } = parseLocal(local);
   const naive = Date.UTC(y, mo - 1, d, h, mi);
-  // Two passes settle the offset, including around DST changes.
-  let guess = naive - zoneOffsetMinutes(new Date(naive), timeZone) * 60000;
-  guess = naive - zoneOffsetMinutes(new Date(guess), timeZone) * 60000;
-  return new Date(guess);
+  const halfDay = 12 * 60 * 60000;
+  const offBefore = zoneOffsetMinutes(new Date(naive - halfDay), timeZone);
+  const offAfter = zoneOffsetMinutes(new Date(naive + halfDay), timeZone);
+
+  const candidates = [naive - offBefore * 60000, naive - offAfter * 60000]
+    .filter((t) => instantToZoned(new Date(t), timeZone) === local)
+    .sort((a, b) => a - b);
+  if (candidates.length > 0) return new Date(candidates[0]);
+
+  // In a spring-forward gap: reading the time with the pre-change offset
+  // lands the same distance past the gap.
+  return new Date(naive - offBefore * 60000);
 }
 
 /** Wall-clock "YYYY-MM-DDTHH:mm" for an instant in `timeZone`. */
