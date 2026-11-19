@@ -11,6 +11,7 @@ export default function RootLayout() {
       <Stack screenOptions={{ contentStyle: { backgroundColor: colors.bg }, headerTintColor: colors.accent }}>
         <Stack.Screen name="(tabs)" options={{ headerShown: false }} />
         <Stack.Screen name="trip/edit" options={{ presentation: 'modal', title: 'Trip' }} />
+        <Stack.Screen name="item/edit" options={{ presentation: 'modal', title: 'Item' }} />
       </Stack>
     </AppDataProvider>
   );

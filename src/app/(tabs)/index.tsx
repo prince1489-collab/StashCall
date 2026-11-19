@@ -2,13 +2,14 @@ import { router } from 'expo-router';
 import { ScrollView, StyleSheet, Text, View } from 'react-native';
 
 import { buildTimeline } from '../../domain/timeline';
+import { stepItemNames } from '../../domain/tripItems';
 import { useAppData } from '../../state/AppData';
 import { PrimaryButton } from '../../ui/Form';
 import { Timeline } from '../../ui/Timeline';
 import { colors, space } from '../../ui/theme';
 
 export default function Today() {
-  const { currentTrip, ready } = useAppData();
+  const { data, currentTrip, ready } = useAppData();
   if (!ready) return null;
 
   if (!currentTrip) {
@@ -37,6 +38,9 @@ export default function Today() {
           <Text style={styles.nextLabel}>Next</Text>
           <Text style={styles.nextTitle}>{next.title}</Text>
           <Text style={styles.nextTime}>{next.localTime}</Text>
+          {stepItemNames(currentTrip, data.items, next).length > 0 ? (
+            <Text style={styles.nextItems}>{stepItemNames(currentTrip, data.items, next).join(' · ')}</Text>
+          ) : null}
         </View>
       ) : (
         <Text style={styles.emptyText}>This trip is over. Add your next one from the Trip tab.</Text>
@@ -44,7 +48,7 @@ export default function Today() {
       {upcoming.length > 1 ? (
         <>
           <Text style={styles.section}>Coming up</Text>
-          <Timeline steps={upcoming.slice(1, 5)} now={now} />
+          <Timeline steps={upcoming.slice(1, 5)} itemsFor={(s) => stepItemNames(currentTrip, data.items, s)} now={now} />
         </>
       ) : null}
     </ScrollView>
@@ -58,6 +62,7 @@ const styles = StyleSheet.create({
   nextLabel: { color: '#CFE7DF', fontSize: 13, fontWeight: '600', textTransform: 'uppercase' },
   nextTitle: { color: '#fff', fontSize: 22, fontWeight: '700', marginTop: space.xs },
   nextTime: { color: '#fff', fontSize: 40, fontWeight: '700', marginTop: space.s, fontVariant: ['tabular-nums'] },
+  nextItems: { color: '#fff', fontSize: 16, marginTop: space.m, lineHeight: 22 },
   section: { fontSize: 13, fontWeight: '600', color: colors.muted, textTransform: 'uppercase', marginTop: space.xl },
   empty: { flex: 1, justifyContent: 'center', padding: space.xl, gap: space.l },
   brand: { fontSize: 15, fontWeight: '700', color: colors.accent },

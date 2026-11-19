@@ -23,6 +23,8 @@ npm run typecheck
 | `src/domain/types.ts` | Data model: Trip, FlightLeg, HotelCheckout, Item, Owner, TimelineStep |
 | `src/domain/timeline.ts` | Works the day out backwards from departure and checkout times |
 | `src/domain/time.ts` | Time-zone conversion for wall-clock times |
+| `src/domain/household.ts` | Adding, editing and removing saved items and owners |
+| `src/storage/photos.ts` | Optional item photos, kept on the phone only |
 | `src/domain/presets.ts` | The 10 preloaded high-regret items |
 | `src/storage/store.ts` | On-device storage (AsyncStorage) |
 

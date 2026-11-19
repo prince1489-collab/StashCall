@@ -39,7 +39,7 @@ function newCheckout(): HotelCheckout {
 }
 
 export default function EditTrip() {
-  const { currentTrip, saveTrip, deleteTrip } = useAppData();
+  const { data, currentTrip, saveTrip, deleteTrip } = useAppData();
   const existing = currentTrip;
 
   const [name, setName] = useState(existing?.name ?? '');
@@ -78,7 +78,8 @@ export default function EditTrip() {
       name: name.trim() || 'My trip',
       flight: draft.flight,
       checkout: draft.checkout,
-      itemIds: existing?.itemIds ?? [],
+      // A new trip starts with every saved item; the Items tab can take some off.
+      itemIds: existing?.itemIds ?? data.items.map((i) => i.id),
       ticked: existing?.ticked ?? {},
       createdAt: existing?.createdAt ?? new Date().toISOString(),
     };
