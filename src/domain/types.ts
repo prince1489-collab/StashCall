@@ -32,6 +32,8 @@ export interface Item {
   note?: string;
   /** Id of the preset this came from, if any. */
   presetId?: string;
+  /** Set for a one-off item that belongs to this trip only, not the saved list. */
+  tripId?: string;
   createdAt: string;
 }
 

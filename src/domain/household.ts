@@ -42,6 +42,20 @@ export function removeItem(data: AppData, id: string): AppData {
   };
 }
 
+/** Items saved for every trip, leaving out one-off items. */
+export function savedItems(items: Item[]): Item[] {
+  return items.filter((i) => !i.tripId);
+}
+
+/** Deletes a trip and the one-off items that belonged to it. */
+export function removeTrip(data: AppData, tripId: string): AppData {
+  return {
+    ...data,
+    trips: data.trips.filter((t) => t.id !== tripId),
+    items: data.items.filter((i) => i.tripId !== tripId),
+  };
+}
+
 /** Finds an owner by name (case-insensitive) or creates one. Empty name → no owner. */
 export function ensureOwner(data: AppData, name: string, newId: IdFn): { data: AppData; ownerId?: string } {
   const clean = name.trim();

@@ -2,7 +2,8 @@ import { createContext, useCallback, useContext, useEffect, useMemo, useRef, use
 import type { ReactNode } from 'react';
 
 import type { Trip } from '../domain/types';
-import { deleteAllPhotos } from '../storage/photos';
+import { removeTrip } from '../domain/household';
+import { deleteAllPhotos, deletePhoto } from '../storage/photos';
 import { EMPTY_DATA, clearData, loadData, saveData } from '../storage/store';
 import type { AppData } from '../storage/store';
 
@@ -53,7 +54,11 @@ export function AppDataProvider({ children }: { children: ReactNode }) {
   );
 
   const deleteTrip = useCallback(
-    (id: string) => update((d) => ({ ...d, trips: d.trips.filter((t) => t.id !== id) })),
+    (id: string) => {
+      // One-off items go with their trip, photos included.
+      for (const i of current.current.items) if (i.tripId === id) deletePhoto(i.photoUri);
+      return update((d) => removeTrip(d, id));
+    },
     [update],
   );
 

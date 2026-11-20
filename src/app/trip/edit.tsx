@@ -3,6 +3,7 @@ import { useMemo, useState } from 'react';
 import { Alert, ScrollView, StyleSheet, Text, TextInput, View } from 'react-native';
 
 import { DEFAULTS } from '../../domain/defaults';
+import { savedItems } from '../../domain/household';
 import { buildTimeline, defaultFlight } from '../../domain/timeline';
 import type { FlightLeg, HotelCheckout, Trip } from '../../domain/types';
 import { newId } from '../../storage/store';
@@ -88,7 +89,7 @@ export default function EditTrip() {
       flight: draft.flight,
       checkout: draft.checkout,
       // A new trip starts with every saved item; the Items tab can take some off.
-      itemIds: existing?.itemIds ?? data.items.map((i) => i.id),
+      itemIds: existing?.itemIds ?? savedItems(data.items).map((i) => i.id),
       ticked: existing?.ticked ?? {},
       createdAt: existing?.createdAt ?? new Date().toISOString(),
     };
