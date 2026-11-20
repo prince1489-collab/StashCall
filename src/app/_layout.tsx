@@ -1,6 +1,7 @@
 import { Stack } from 'expo-router';
 import { StatusBar } from 'expo-status-bar';
 
+import { NotificationActions } from '../reminders/NotificationActions';
 import { RemindersProvider } from '../reminders/Reminders';
 import { configureNotifications } from '../reminders/schedule';
 import { AppDataProvider } from '../state/AppData';
@@ -12,6 +13,7 @@ export default function RootLayout() {
   return (
     <AppDataProvider>
       <RemindersProvider>
+        <NotificationActions />
         <StatusBar style="dark" />
         <Stack screenOptions={{ contentStyle: { backgroundColor: colors.bg }, headerTintColor: colors.accent }}>
           <Stack.Screen name="(tabs)" options={{ headerShown: false }} />

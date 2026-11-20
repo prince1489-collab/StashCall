@@ -22,6 +22,18 @@ export function openChecklistStep(steps: TimelineStep[], now: Date): TimelineSte
   return undefined;
 }
 
+/** Ticks every given item for one step, e.g. from a reminder's "Done" button. */
+export function tickAll(data: AppData, tripId: string, kind: StepKind, itemIds: string[]): AppData {
+  return {
+    ...data,
+    trips: data.trips.map((trip) => {
+      if (trip.id !== tripId) return trip;
+      const done = new Set([...(trip.ticked[kind] ?? []), ...itemIds]);
+      return { ...trip, ticked: { ...trip.ticked, [kind]: [...done] } };
+    }),
+  };
+}
+
 /** Ticks or unticks an item for one step of the current trip. */
 export function toggleTick(data: AppData, tripId: string, kind: StepKind, itemId: string): AppData {
   return {
