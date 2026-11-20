@@ -91,6 +91,7 @@ export default function EditTrip() {
       // A new trip starts with every saved item; the Items tab can take some off.
       itemIds: existing?.itemIds ?? savedItems(data.items).map((i) => i.id),
       ticked: existing?.ticked ?? {},
+      tickets: existing?.tickets,
       createdAt: existing?.createdAt ?? new Date().toISOString(),
     };
     await saveTrip(trip);

@@ -8,6 +8,7 @@ import { useNow } from '../../hooks/useNow';
 import { useAppData } from '../../state/AppData';
 import { PrimaryButton, formatLocalDate } from '../../ui/Form';
 import { ReminderStatus } from '../../ui/ReminderStatus';
+import { Tickets } from '../../ui/Tickets';
 import { Timeline } from '../../ui/Timeline';
 import { colors, space } from '../../ui/theme';
 
@@ -45,6 +46,7 @@ export default function TripScreen() {
       <Text style={styles.share} onPress={share} accessibilityRole="button">
         Share checklist
       </Text>
+      <Tickets trip={currentTrip} />
       <ReminderStatus />
       <Timeline steps={steps} now={now} itemsFor={(s) => stepItemNames(currentTrip, data.items, s)} />
     </ScrollView>

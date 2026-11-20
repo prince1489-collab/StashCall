@@ -38,7 +38,19 @@
           "microphonePermission": false
         }
       ],
-      "expo-notifications"
+      "expo-notifications",
+      [
+        "expo-share-intent",
+        {
+          "androidIntentFilters": [
+            "image/*"
+          ],
+          "androidMultiIntentFilters": [
+            "image/*"
+          ],
+          "disableIOS": true
+        }
+      ]
     ],
     "owner": "prince1489",
     "extra": {

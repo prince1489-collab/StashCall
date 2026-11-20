@@ -63,6 +63,13 @@ export interface HotelCheckout {
   hotelName?: string;
 }
 
+export interface Ticket {
+  id: string;
+  /** Local file URI of the image. */
+  uri: string;
+  addedAt: string;
+}
+
 export interface Trip {
   id: string;
   name: string;
@@ -71,6 +78,8 @@ export interface Trip {
   checkout?: HotelCheckout;
   /** Items chosen for this trip (ids into the household item list). */
   itemIds: string[];
+  /** Screenshots of tickets, boarding passes or bookings, kept on the phone. */
+  tickets?: Ticket[];
   /** Item ids ticked off, keyed by timeline step kind. */
   ticked: Partial<Record<StepKind, string[]>>;
   createdAt: string;

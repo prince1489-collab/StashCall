@@ -11,6 +11,7 @@ import { useAppData } from '../../state/AppData';
 import { Checklist } from '../../ui/Checklist';
 import { PrimaryButton, formatLocalDate } from '../../ui/Form';
 import { ReminderStatus } from '../../ui/ReminderStatus';
+import { Tickets } from '../../ui/Tickets';
 import { Timeline } from '../../ui/Timeline';
 import { colors, space } from '../../ui/theme';
 
@@ -65,6 +66,7 @@ export default function Today() {
       ) : (
         <Text style={styles.emptyText}>This trip is over. Add your next one from the Trip tab.</Text>
       )}
+      <Tickets trip={currentTrip} compact />
       <ReminderStatus />
       {upcoming.length > 1 ? (
         <>
