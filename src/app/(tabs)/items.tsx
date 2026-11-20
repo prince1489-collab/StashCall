@@ -2,7 +2,7 @@ import { router } from 'expo-router';
 import { useState } from 'react';
 import { Pressable, ScrollView, StyleSheet, Switch, Text, View } from 'react-native';
 
-import { addPresets, setOnCurrentTrip } from '../../domain/household';
+import { addPresets, savedItems, setOnCurrentTrip } from '../../domain/household';
 import { PRESET_ITEMS } from '../../domain/presets';
 import { newId } from '../../storage/store';
 import { useAppData } from '../../state/AppData';
@@ -36,6 +36,9 @@ export default function Items() {
     if (picked.length === 0) setShowPresets(false);
     router.push('/item/edit');
   };
+
+  const saved = savedItems(data.items);
+  const oneOff = currentTrip ? data.items.filter((i) => i.tripId === currentTrip.id) : [];
 
   const onTrip = new Set(currentTrip?.itemIds ?? []);
   const ownerOf = (id?: string) => data.owners.find((o) => o.id === id);
@@ -96,7 +99,7 @@ export default function Items() {
               : 'Saved for every trip. Add a trip to get reminders.'}
           </Text>
           <Section>
-            {data.items.map((item) => (
+            {saved.map((item) => (
               <ItemRow
                 key={item.id}
                 item={item}
@@ -115,6 +118,37 @@ export default function Items() {
               />
             ))}
           </Section>
+          {currentTrip ? (
+            <>
+              <View style={styles.header}>
+                <Text style={styles.subtitle}>Just for {currentTrip.name}</Text>
+                <Text
+                  style={styles.addLink}
+                  onPress={() => router.push({ pathname: '/item/edit', params: { tripOnly: '1' } })}
+                  accessibilityRole="button"
+                >
+                  Add
+                </Text>
+              </View>
+              <Text style={styles.text}>
+                {oneOff.length > 0
+                  ? 'One-off items, like a gift to take. They go when the trip is deleted.'
+                  : 'Taking something just this once, like a gift? Add it here so it stays off your saved list.'}
+              </Text>
+              {oneOff.length > 0 ? (
+                <Section>
+                  {oneOff.map((item) => (
+                    <ItemRow
+                      key={item.id}
+                      item={item}
+                      owner={ownerOf(item.ownerId)}
+                      onPress={() => router.push({ pathname: '/item/edit', params: { id: item.id } })}
+                    />
+                  ))}
+                </Section>
+              ) : null}
+            </>
+          ) : null}
           {remaining.length > 0 ? (
             <Text style={styles.link} onPress={() => setShowPresets(true)} accessibilityRole="button">
               Add common items
@@ -130,6 +164,7 @@ const styles = StyleSheet.create({
   container: { padding: space.l, paddingBottom: 48 },
   header: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' },
   title: { fontSize: 24, fontWeight: '700', color: colors.text },
+  subtitle: { fontSize: 18, fontWeight: '700', color: colors.text, flex: 1 },
   addLink: { fontSize: 16, color: colors.accent, fontWeight: '600', padding: space.s },
   text: { fontSize: 15, color: colors.muted, marginTop: space.xs, marginBottom: space.l, lineHeight: 21 },
   presetRow: {

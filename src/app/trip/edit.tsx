@@ -3,6 +3,7 @@ import { useMemo, useState } from 'react';
 import { Alert, ScrollView, StyleSheet, Text, TextInput, View } from 'react-native';
 
 import { DEFAULTS } from '../../domain/defaults';
+import { savedItems } from '../../domain/household';
 import { buildTimeline, defaultFlight } from '../../domain/timeline';
 import type { FlightLeg, HotelCheckout, Trip } from '../../domain/types';
 import { newId } from '../../storage/store';
@@ -69,9 +70,17 @@ export default function EditTrip() {
     });
   };
 
+  // Abroad, the phone's zone is usually the wrong guess for the hotel, and a
+  // wrong zone moves the sweep and checkout reminders by hours. Make it a choice.
+  const zoneUnset = hasCheckout && hasFlight && flight.international && !checkout.timeZoneConfirmed;
+
   const save = async () => {
     if (!hasFlight && !hasCheckout) {
       Alert.alert('Add a flight or a hotel checkout', 'StashCall needs at least one time to plan around.');
+      return;
+    }
+    if (zoneUnset) {
+      Alert.alert("Choose the hotel's time zone", 'Pick where the hotel is, so the checkout reminders arrive on time.');
       return;
     }
     const trip: Trip = {
@@ -80,8 +89,9 @@ export default function EditTrip() {
       flight: draft.flight,
       checkout: draft.checkout,
       // A new trip starts with every saved item; the Items tab can take some off.
-      itemIds: existing?.itemIds ?? data.items.map((i) => i.id),
+      itemIds: existing?.itemIds ?? savedItems(data.items).map((i) => i.id),
       ticked: existing?.ticked ?? {},
+      tickets: existing?.tickets,
       createdAt: existing?.createdAt ?? new Date().toISOString(),
     };
     await saveTrip(trip);
@@ -173,7 +183,8 @@ export default function EditTrip() {
               label="Hotel time zone"
               hint="Where the hotel is, not where you are now"
               value={checkout.timeZone}
-              onChange={(timeZone) => setC({ timeZone })}
+              unset={zoneUnset}
+              onChange={(timeZone) => setC({ timeZone, timeZoneConfirmed: true })}
             />
             <MinutesStepper
               label="Sweep the room"
@@ -191,7 +202,8 @@ export default function EditTrip() {
         <View style={formStyles.section}>
           <Text style={formStyles.sectionTitle}>Your plan</Text>
           {inPast ? <Text style={styles.warn}>These times are in the past.</Text> : null}
-          <Timeline steps={preview} />
+          {zoneUnset ? <Text style={styles.warn}>Checkout times will show once you choose the hotel's time zone.</Text> : null}
+          <Timeline steps={zoneUnset ? preview.filter((s) => s.kind !== 'sweep' && s.kind !== 'checkout') : preview} />
         </View>
       ) : null}
 

@@ -1,12 +1,14 @@
 import { Link, router } from 'expo-router';
-import { ScrollView, StyleSheet, Text, View } from 'react-native';
+import { ScrollView, Share, StyleSheet, Text, View } from 'react-native';
 
+import { tripChecklistText } from '../../domain/shareText';
 import { buildTimeline } from '../../domain/timeline';
 import { stepItemNames } from '../../domain/tripItems';
 import { useNow } from '../../hooks/useNow';
 import { useAppData } from '../../state/AppData';
-import { PrimaryButton } from '../../ui/Form';
+import { PrimaryButton, formatLocalDate } from '../../ui/Form';
 import { ReminderStatus } from '../../ui/ReminderStatus';
+import { Tickets } from '../../ui/Tickets';
 import { Timeline } from '../../ui/Timeline';
 import { colors, space } from '../../ui/theme';
 
@@ -28,6 +30,8 @@ export default function TripScreen() {
   }
 
   const steps = buildTimeline(currentTrip);
+  const share = () =>
+    Share.share({ message: tripChecklistText(currentTrip, data.items, data.owners, formatLocalDate) }).catch(() => {});
   return (
     <ScrollView contentContainerStyle={styles.container}>
       <View style={styles.header}>
@@ -39,6 +43,10 @@ export default function TripScreen() {
       <Text style={styles.note}>
         Estimates are worked out from your flight or checkout time. Tap Edit to change any assumption.
       </Text>
+      <Text style={styles.share} onPress={share} accessibilityRole="button">
+        Share checklist
+      </Text>
+      <Tickets trip={currentTrip} />
       <ReminderStatus />
       <Timeline steps={steps} now={now} itemsFor={(s) => stepItemNames(currentTrip, data.items, s)} />
     </ScrollView>
@@ -50,6 +58,7 @@ const styles = StyleSheet.create({
   header: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' },
   title: { fontSize: 24, fontWeight: '700', color: colors.text, flex: 1 },
   edit: { fontSize: 16, color: colors.accent, fontWeight: '600', padding: space.s },
+  share: { fontSize: 16, color: colors.accent, fontWeight: '600', paddingVertical: space.m },
   note: { fontSize: 14, color: colors.muted, marginTop: space.xs },
   empty: { flex: 1, justifyContent: 'center', padding: space.xl, gap: space.l },
   emptyTitle: { fontSize: 22, fontWeight: '700', color: colors.text },

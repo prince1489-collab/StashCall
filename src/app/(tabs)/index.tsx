@@ -6,10 +6,12 @@ import { instantToZoned } from '../../domain/time';
 import { buildTimeline } from '../../domain/timeline';
 import { stepItemNames, stepItems } from '../../domain/tripItems';
 import { useNow } from '../../hooks/useNow';
+import { sendFeedback } from '../../feedback/sendFeedback';
 import { useAppData } from '../../state/AppData';
 import { Checklist } from '../../ui/Checklist';
 import { PrimaryButton, formatLocalDate } from '../../ui/Form';
 import { ReminderStatus } from '../../ui/ReminderStatus';
+import { Tickets } from '../../ui/Tickets';
 import { Timeline } from '../../ui/Timeline';
 import { colors, space } from '../../ui/theme';
 
@@ -64,6 +66,7 @@ export default function Today() {
       ) : (
         <Text style={styles.emptyText}>This trip is over. Add your next one from the Trip tab.</Text>
       )}
+      <Tickets trip={currentTrip} compact />
       <ReminderStatus />
       {upcoming.length > 1 ? (
         <>
@@ -71,12 +74,16 @@ export default function Today() {
           <Timeline steps={upcoming.slice(1, 5)} itemsFor={(s) => stepItemNames(currentTrip, data.items, s)} now={now} />
         </>
       ) : null}
+      <Text style={styles.footerLink} onPress={sendFeedback} accessibilityRole="button">
+        Send feedback
+      </Text>
     </ScrollView>
   );
 }
 
 const styles = StyleSheet.create({
   container: { padding: space.l, paddingBottom: 48 },
+  footerLink: { color: colors.accent, fontSize: 15, fontWeight: '600', textAlign: 'center', marginTop: space.xl, padding: space.s },
   tripName: { fontSize: 15, color: colors.muted, marginBottom: space.s },
   nextCard: { backgroundColor: colors.accent, borderRadius: 16, padding: space.xl },
   nextLabel: { color: '#CFE7DF', fontSize: 13, fontWeight: '600', textTransform: 'uppercase' },

@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest';
 
 import type { AppData } from '../../storage/store';
-import { addPresets, ensureOwner, removeItem, setOnCurrentTrip, upsertItem } from '../household';
+import { addPresets, ensureOwner, removeItem, removeTrip, savedItems, setOnCurrentTrip, upsertItem } from '../household';
 import type { Trip } from '../types';
 
 let n = 0;
@@ -90,5 +90,26 @@ describe('stepItemNames', () => {
     expect(at('pack')).toEqual(['Passports', 'Charger']);
     expect(at('sweep')).toEqual(['Charger']);
     expect(at('takeoff')).toEqual([]);
+  });
+});
+
+describe('one-off items', () => {
+  it('leaves them out of the saved list and deletes them with their trip', () => {
+    const data: AppData = {
+      version: 1,
+      owners: [],
+      items: [
+        { id: 'a', name: 'Passports', moment: 'home', createdAt: '' },
+        { id: 'g', name: 'Gift', moment: 'home', tripId: 't1', createdAt: '' },
+      ],
+      trips: [
+        { id: 't1', name: 'One', itemIds: ['a', 'g'], ticked: {}, createdAt: '' },
+        { id: 't2', name: 'Two', itemIds: ['a'], ticked: {}, createdAt: '' },
+      ],
+    };
+    expect(savedItems(data.items).map((i) => i.id)).toEqual(['a']);
+    const after = removeTrip(data, 't1');
+    expect(after.trips.map((t) => t.id)).toEqual(['t2']);
+    expect(after.items.map((i) => i.id)).toEqual(['a']);
   });
 });

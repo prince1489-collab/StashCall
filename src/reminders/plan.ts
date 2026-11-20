@@ -11,6 +11,9 @@ export interface PlannedReminder {
   kind: StepKind;
   /** Time-critical reminders use the strongest delivery Android allows. */
   critical: boolean;
+  tripId: string;
+  /** Whether the reminder lists items, so it gets a "Done" button. */
+  hasItems: boolean;
 }
 
 /** Joins item names for a notification: "Passports, Glasses and Phone charger". */
@@ -68,7 +71,8 @@ export function planReminders(trip: Trip, items: Item[], now: Date): PlannedRemi
   return steps
     .filter((s) => s.notify && s.at.getTime() > now.getTime())
     .map((s) => {
-      const text = textFor(s, steps, stepItemNames(trip, items, s));
+      const names = stepItemNames(trip, items, s);
+      const text = textFor(s, steps, names);
       if (!text) return null;
       return {
         id: `${trip.id}:${s.kind}`,
@@ -76,6 +80,8 @@ export function planReminders(trip: Trip, items: Item[], now: Date): PlannedRemi
         ...text,
         kind: s.kind,
         critical: s.kind === 'wake' || s.kind === 'leave',
+        tripId: trip.id,
+        hasItems: names.length > 0,
       };
     })
     .filter((r): r is PlannedReminder => r !== null);

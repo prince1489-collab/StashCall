@@ -43,9 +43,9 @@ export function RemindersProvider({ children }: { children: ReactNode }) {
         setPermission(perm);
         setExact(ex);
         const plan = currentTrip ? planReminders(currentTrip, data.items, new Date()) : [];
-        setScheduled(await syncReminders(plan));
+        setScheduled(await syncReminders(plan, data.trips.map((t) => t.id)));
       }),
-    [queue, currentTrip, data.items],
+    [queue, currentTrip, data.items, data.trips],
   );
 
   useEffect(() => {

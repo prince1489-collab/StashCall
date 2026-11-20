@@ -2,22 +2,23 @@ import { router, useLocalSearchParams } from 'expo-router';
 import { useRef, useState } from 'react';
 import { Alert, Pressable, ScrollView, StyleSheet, Text, TextInput, View, type ScrollViewInstance } from 'react-native';
 
-import { ensureOwner, removeItem, upsertItem } from '../../domain/household';
+import { ensureOwner, removeItem, setOnCurrentTrip, upsertItem } from '../../domain/household';
 import type { Item, ItemMoment } from '../../domain/types';
 import { deletePhoto, takeItemPhoto } from '../../storage/photos';
 import { newId } from '../../storage/store';
 import { useKeyboardInset } from '../../hooks/useKeyboardInset';
 import { useAppData } from '../../state/AppData';
-import { PrimaryButton, Row, Section } from '../../ui/Form';
+import { PrimaryButton, Row, Section, SwitchRow } from '../../ui/Form';
 import { ItemThumb, MOMENT_LABEL } from '../../ui/ItemRow';
 import { colors, space } from '../../ui/theme';
 
 const MOMENTS: ItemMoment[] = ['home', 'checkout', 'both'];
 
 export default function EditItem() {
-  const { id } = useLocalSearchParams<{ id?: string }>();
-  const { data, update } = useAppData();
+  const { id, tripOnly } = useLocalSearchParams<{ id?: string; tripOnly?: string }>();
+  const { data, update, currentTrip } = useAppData();
   const existing = data.items.find((i) => i.id === id);
+  const [justThisTrip, setJustThisTrip] = useState(existing ? !!existing.tripId : tripOnly === '1' && !!currentTrip);
 
   const [name, setName] = useState(existing?.name ?? '');
   const [moment, setMoment] = useState<ItemMoment>(existing?.moment ?? 'both');
@@ -52,9 +53,12 @@ export default function EditItem() {
         photoUri,
         note: note.trim() || undefined,
         presetId: existing?.presetId,
+        tripId: justThisTrip ? (existing?.tripId ?? currentTrip?.id) : undefined,
         createdAt: existing?.createdAt ?? new Date().toISOString(),
       };
-      return upsertItem(withOwner, item);
+      const saved = upsertItem(withOwner, item);
+      // A one-off item is only useful on its trip.
+      return item.tripId ? setOnCurrentTrip(saved, item.id, true) : saved;
     });
     router.back();
   };
@@ -98,6 +102,17 @@ export default function EditItem() {
           returnKeyType="done"
         />
       </Section>
+
+      {currentTrip || existing?.tripId ? (
+        <Section>
+          <SwitchRow
+            label="Just for this trip"
+            hint={justThisTrip ? `Only on ${currentTrip?.name ?? 'this trip'}. Not saved for later trips.` : 'Saved for every trip'}
+            value={justThisTrip}
+            onChange={setJustThisTrip}
+          />
+        </Section>
+      ) : null}
 
       <Section title="Remind me">
         {MOMENTS.map((m) => (

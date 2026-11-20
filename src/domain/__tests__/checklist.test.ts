@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest';
 
 import type { AppData } from '../../storage/store';
-import { openChecklistStep, toggleTick } from '../checklist';
+import { openChecklistStep, tickAll, toggleTick } from '../checklist';
 import { buildTimeline, defaultFlight } from '../timeline';
 
 const steps = buildTimeline({
@@ -40,5 +40,19 @@ describe('toggleTick', () => {
     const once = toggleTick(data, 't', 'pack', 'a');
     expect(once.trips[0].ticked.pack).toEqual(['a']);
     expect(toggleTick(once, 't', 'pack', 'a').trips[0].ticked.pack).toEqual([]);
+  });
+});
+
+describe('tickAll', () => {
+  it('ticks every item for a step and keeps earlier ticks', () => {
+    const data: AppData = {
+      version: 1,
+      owners: [],
+      items: [],
+      trips: [{ id: 't', name: 'T', itemIds: ['a', 'b', 'c'], ticked: { pack: ['c'] }, createdAt: '' }],
+    };
+    const done = tickAll(data, 't', 'pack', ['a', 'b', 'c']);
+    expect([...(done.trips[0].ticked.pack ?? [])].sort()).toEqual(['a', 'b', 'c']);
+    expect(done.trips[0].ticked.sweep).toBeUndefined();
   });
 });

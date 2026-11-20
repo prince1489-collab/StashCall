@@ -1,8 +1,8 @@
 import Constants from 'expo-constants';
 import { router } from 'expo-router';
-import { Alert, Linking, ScrollView, StyleSheet, Text } from 'react-native';
+import { Alert, ScrollView, StyleSheet, Text } from 'react-native';
 
-import { FEEDBACK_URL } from '../config';
+import { sendFeedback } from '../feedback/sendFeedback';
 import { useAppData } from '../state/AppData';
 import { Row, Section } from '../ui/Form';
 import { ReminderStatus } from '../ui/ReminderStatus';
@@ -45,13 +45,11 @@ export default function Settings() {
         </Text>
       </Section>
 
-      {FEEDBACK_URL ? (
-        <Section title="Tester feedback">
-          <Text style={styles.action} onPress={() => Linking.openURL(FEEDBACK_URL)} accessibilityRole="link">
-            Tell us what worked and what didn't
-          </Text>
-        </Section>
-      ) : null}
+      <Section title="Tester feedback">
+        <Text style={styles.action} onPress={sendFeedback} accessibilityRole="button">
+          Send feedback
+        </Text>
+      </Section>
 
       <Text style={styles.version}>StashCall {Constants.expoConfig?.version ?? ''} · tester build</Text>
     </ScrollView>

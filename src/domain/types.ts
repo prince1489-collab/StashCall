@@ -32,6 +32,8 @@ export interface Item {
   note?: string;
   /** Id of the preset this came from, if any. */
   presetId?: string;
+  /** Set for a one-off item that belongs to this trip only, not the saved list. */
+  tripId?: string;
   createdAt: string;
 }
 
@@ -56,7 +58,16 @@ export interface HotelCheckout {
   timeZone: string;
   /** How long before checkout to send the room sweep reminder. */
   sweepMinutesBefore: number;
+  /** True once the user has picked the hotel's zone themselves. */
+  timeZoneConfirmed?: boolean;
   hotelName?: string;
+}
+
+export interface Ticket {
+  id: string;
+  /** Local file URI of the image. */
+  uri: string;
+  addedAt: string;
 }
 
 export interface Trip {
@@ -67,6 +78,8 @@ export interface Trip {
   checkout?: HotelCheckout;
   /** Items chosen for this trip (ids into the household item list). */
   itemIds: string[];
+  /** Screenshots of tickets, boarding passes or bookings, kept on the phone. */
+  tickets?: Ticket[];
   /** Item ids ticked off, keyed by timeline step kind. */
   ticked: Partial<Record<StepKind, string[]>>;
   createdAt: string;
