@@ -82,13 +82,17 @@ export async function requestExactAlarms(): Promise<boolean> {
  * everything StashCall scheduled before is cancelled, then the plan is
  * scheduled. Simple and safe because the plan is small (≤ 5 per trip).
  */
-export async function syncReminders(plan: PlannedReminder[]): Promise<number> {
-  // Cancel everything except snoozes, which the user asked for themselves.
+export async function syncReminders(plan: PlannedReminder[], tripIds: string[]): Promise<number> {
+  // Cancel everything except snoozes, which the user asked for themselves,
+  // unless the snoozed reminder's trip has since been deleted.
   const existing = await Notifications.getAllScheduledNotificationsAsync();
+  const keep = (n: Notifications.NotificationRequest) => {
+    if (!n.identifier.startsWith(SNOOZE_PREFIX)) return false;
+    const tripId = (n.content.data as { tripId?: string } | undefined)?.tripId;
+    return !tripId || tripIds.includes(tripId);
+  };
   await Promise.all(
-    existing
-      .filter((n) => !n.identifier.startsWith(SNOOZE_PREFIX))
-      .map((n) => Notifications.cancelScheduledNotificationAsync(n.identifier)),
+    existing.filter((n) => !keep(n)).map((n) => Notifications.cancelScheduledNotificationAsync(n.identifier)),
   );
   if ((await getPermission()) !== 'granted') return 0;
   let scheduled = 0;

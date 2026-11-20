@@ -43,6 +43,8 @@ export function NotificationActions() {
         }
       }
       await Notifications.dismissNotificationAsync(request.identifier).catch(() => {});
+      // Otherwise a reload would hand us the same press again.
+      Notifications.clearLastNotificationResponse();
     };
 
     // A button press that launched the app, then any while it's running.
