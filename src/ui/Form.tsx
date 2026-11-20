@@ -184,12 +184,19 @@ export function deviceZone(): string {
   return Intl.DateTimeFormat().resolvedOptions().timeZone || 'Europe/London';
 }
 
-export function ZoneRow(props: { label: string; hint?: string; value: string; onChange: (z: string) => void }) {
+export function ZoneRow(props: {
+  label: string;
+  hint?: string;
+  value: string;
+  onChange: (z: string) => void;
+  /** Show "Choose" instead of the zone until the user picks one. */
+  unset?: boolean;
+}) {
   const [open, setOpen] = useState(false);
   const zones = Array.from(new Set([deviceZone(), ...COMMON_ZONES]));
   return (
     <Row label={props.label} hint={props.hint}>
-      <PillButton label={zoneLabel(props.value)} onPress={() => setOpen(true)} />
+      <PillButton label={props.unset ? 'Choose' : zoneLabel(props.value)} onPress={() => setOpen(true)} />
       <Modal visible={open} animationType="slide" presentationStyle="pageSheet" onRequestClose={() => setOpen(false)}>
         <View style={styles.modalHeader}>
           <Text style={styles.modalTitle}>Hotel time zone</Text>
@@ -207,9 +214,9 @@ export function ZoneRow(props: { label: string; hint?: string; value: string; on
                 setOpen(false);
               }}
               accessibilityRole="button"
-              accessibilityState={{ selected: z === props.value }}
+              accessibilityState={{ selected: !props.unset && z === props.value }}
             >
-              <Text style={[styles.label, z === props.value && { color: colors.accent, fontWeight: '600' }]}>
+              <Text style={[styles.label, !props.unset && z === props.value && { color: colors.accent, fontWeight: '600' }]}>
                 {zoneLabel(z)}
               </Text>
               <Text style={styles.hint}>{z}</Text>

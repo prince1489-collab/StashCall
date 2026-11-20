@@ -56,6 +56,8 @@ export interface HotelCheckout {
   timeZone: string;
   /** How long before checkout to send the room sweep reminder. */
   sweepMinutesBefore: number;
+  /** True once the user has picked the hotel's zone themselves. */
+  timeZoneConfirmed?: boolean;
   hotelName?: string;
 }
 
