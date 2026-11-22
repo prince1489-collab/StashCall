@@ -25,8 +25,14 @@ export function NotificationActions() {
 
     const handle = async (response: Notifications.NotificationResponse) => {
       const { actionIdentifier, notification } = response;
-      if (actionIdentifier !== ACTION_DONE && actionIdentifier !== ACTION_SNOOZE) return;
       const request = notification.request;
+      if (actionIdentifier !== ACTION_DONE && actionIdentifier !== ACTION_SNOOZE) {
+        // A plain tap opens the app; reminders are sticky, so clear it too.
+        if (actionIdentifier === Notifications.DEFAULT_ACTION_IDENTIFIER) {
+          await Notifications.dismissNotificationAsync(request.identifier).catch(() => {});
+        }
+        return;
+      }
       const key = `${request.identifier}:${actionIdentifier}:${notification.date}`;
       if (handled.current.has(key)) return;
       handled.current.add(key);

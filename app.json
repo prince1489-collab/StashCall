@@ -38,7 +38,14 @@
           "microphonePermission": false
         }
       ],
-      "expo-notifications",
+      [
+        "expo-notifications",
+        {
+          "sounds": [
+            "./assets/sounds/stashcall_alarm.wav"
+          ]
+        }
+      ],
       [
         "expo-share-intent",
         {

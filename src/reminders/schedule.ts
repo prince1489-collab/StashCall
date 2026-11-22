@@ -3,7 +3,12 @@ import { Platform } from 'react-native';
 
 import type { PlannedReminder } from './plan';
 
-const CHANNEL = 'travel-reminders';
+// Android fixes a channel's sound and importance when it's first created, so
+// alarm-style reminders need a new channel id; the old quiet one is removed.
+const CHANNEL = 'travel-alarms';
+const OLD_CHANNEL = 'travel-reminders';
+/** Bundled via the expo-notifications plugin in app.json (assets/sounds). */
+const ALARM_SOUND = 'stashcall_alarm.wav';
 
 /** Notification button sets. Item reminders get "Done", every reminder gets snooze. */
 export const CATEGORY_ITEMS = 'reminder-items';
@@ -36,10 +41,21 @@ export function configureNotifications(): void {
   Notifications.setNotificationCategoryAsync(CATEGORY_PLAIN, [SNOOZE_BUTTON]).catch(() => {});
   if (Platform.OS === 'android') {
     Notifications.setNotificationChannelAsync(CHANNEL, {
-      name: 'Travel reminders',
-      importance: Notifications.AndroidImportance.HIGH,
-      sound: 'default',
+      name: 'Travel alarms',
+      description: 'Packing, wake-up, leave-home and room-sweep reminders',
+      importance: Notifications.AndroidImportance.MAX,
+      sound: ALARM_SOUND,
+      // Play on the alarm volume, so a phone on silent still rings.
+      audioAttributes: {
+        usage: Notifications.AndroidAudioUsage.ALARM,
+        contentType: Notifications.AndroidAudioContentType.SONIFICATION,
+      },
+      vibrationPattern: [0, 800, 400, 800, 400, 800, 400, 800],
+      enableVibrate: true,
+      bypassDnd: true,
+      lockscreenVisibility: Notifications.AndroidNotificationVisibility.PUBLIC,
     }).catch(() => {});
+    Notifications.deleteNotificationChannelAsync(OLD_CHANNEL).catch(() => {});
   }
 }
 
@@ -103,7 +119,10 @@ export async function syncReminders(plan: PlannedReminder[], tripIds: string[]):
       content: {
         title: r.title,
         body: r.body,
-        sound: 'default',
+        sound: ALARM_SOUND,
+        priority: Notifications.AndroidNotificationPriority.MAX,
+        // Stays until "Done", "In 15 min" or a tap, like an alarm.
+        sticky: true,
         data: { kind: r.kind, tripId: r.tripId },
         categoryIdentifier: r.hasItems ? CATEGORY_ITEMS : CATEGORY_PLAIN,
       },
@@ -126,7 +145,9 @@ export async function snoozeReminder(content: Notifications.NotificationContent,
     content: {
       title: content.title ?? 'StashCall',
       body: content.body ?? '',
-      sound: 'default',
+      sound: ALARM_SOUND,
+      priority: Notifications.AndroidNotificationPriority.MAX,
+      sticky: true,
       data: content.data,
       categoryIdentifier: content.categoryIdentifier ?? undefined,
     },
@@ -142,7 +163,13 @@ export async function snoozeReminder(content: Notifications.NotificationContent,
 export async function sendTestReminder(body: string): Promise<boolean> {
   if ((await requestPermission()) !== 'granted') return false;
   await Notifications.scheduleNotificationAsync({
-    content: { title: 'StashCall test reminder', body, sound: 'default', categoryIdentifier: CATEGORY_PLAIN },
+    content: {
+      title: 'StashCall test reminder',
+      body,
+      sound: ALARM_SOUND,
+      priority: Notifications.AndroidNotificationPriority.MAX,
+      categoryIdentifier: CATEGORY_PLAIN,
+    },
     trigger: {
       type: Notifications.SchedulableTriggerInputTypes.TIME_INTERVAL,
       seconds: 5,
