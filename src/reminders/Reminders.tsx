@@ -3,7 +3,7 @@ import type { ReactNode } from 'react';
 import { AppState } from 'react-native';
 
 import { useAppData } from '../state/AppData';
-import { planReminders } from './plan';
+import { planPrepReminders, planReminders } from './plan';
 import { latestOnly } from './serial';
 import type { PermissionState } from './schedule';
 import { getPermission, hasExactAlarms, requestExactAlarms, requestPermission, syncReminders } from './schedule';
@@ -42,10 +42,13 @@ export function RemindersProvider({ children }: { children: ReactNode }) {
         const [perm, ex] = await Promise.all([getPermission(), hasExactAlarms()]);
         setPermission(perm);
         setExact(ex);
-        const plan = currentTrip ? planReminders(currentTrip, data.items, new Date()) : [];
+        const now = new Date();
+        const plan = currentTrip
+          ? [...planPrepReminders(currentTrip, data.insurance, now), ...planReminders(currentTrip, data.items, now)]
+          : [];
         setScheduled(await syncReminders(plan, data.trips.map((t) => t.id)));
       }),
-    [queue, currentTrip, data.items, data.trips],
+    [queue, currentTrip, data.items, data.trips, data.insurance],
   );
 
   useEffect(() => {

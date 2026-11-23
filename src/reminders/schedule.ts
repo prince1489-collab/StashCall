@@ -114,7 +114,7 @@ export async function requestExactAlarms(): Promise<boolean> {
 /**
  * Makes the phone's scheduled notifications match `plan` exactly:
  * everything StashCall scheduled before is cancelled, then the plan is
- * scheduled. Simple and safe because the plan is small (≤ 5 per trip).
+ * scheduled. Simple and safe because the plan is small (a dozen or so per trip).
  */
 export async function syncReminders(plan: PlannedReminder[], tripIds: string[]): Promise<number> {
   // Cancel everything except snoozes, which the user asked for themselves,

@@ -87,10 +87,20 @@ export interface Trip {
   itemIds: string[];
   /** Screenshots of tickets, boarding passes or bookings, kept on the phone. */
   tickets?: Ticket[];
+  /** Things sorted before travel day, such as insurance and visas. */
+  prep?: Partial<Record<PrepKind, PrepStatus>>;
   /** Item ids ticked off, keyed by timeline step kind. */
   ticked: Partial<Record<StepKind, string[]>>;
   createdAt: string;
 }
+
+/** Things to sort out in the weeks before a trip. */
+export type PrepKind = 'insurance' | 'visa';
+
+/** How the household is insured for travel. */
+export type InsuranceCover = 'annual' | 'card' | 'perTrip';
+
+export type PrepStatus = 'done' | 'notNeeded';
 
 export type StepKind =
   | 'pack'

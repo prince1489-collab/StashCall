@@ -9,6 +9,7 @@ import { stepItemNames, stepItems } from '../../domain/tripItems';
 import { useNow } from '../../hooks/useNow';
 import { sendFeedback } from '../../feedback/sendFeedback';
 import { useAppData } from '../../state/AppData';
+import { BeforeYouGo } from '../../ui/BeforeYouGo';
 import { Checklist } from '../../ui/Checklist';
 import { PrimaryButton, formatLocalDate } from '../../ui/Form';
 import { ReminderStatus } from '../../ui/ReminderStatus';
@@ -99,6 +100,7 @@ export default function Today() {
           />
         </View>
       )}
+      {next ? <BeforeYouGo trip={currentTrip} compact /> : null}
       <Tickets trip={currentTrip} compact />
       <ReminderStatus />
       {upcoming.length > 1 ? (
