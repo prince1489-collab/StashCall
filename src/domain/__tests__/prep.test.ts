@@ -120,3 +120,16 @@ describe('document photos', () => {
     expect(docsFor(data, data.trips[0], 'visa')).toEqual([]);
   });
 });
+
+describe('documents for replacement cover', () => {
+  it('keeps a single-trip policy with its trip when the annual one ends first', async () => {
+    const { addDoc, docsFor } = await import('../prep');
+    const t1 = trip(true);
+    const t2 = { ...trip(false), id: 't2' };
+    let data: AppData = { ...EMPTY_DATA, insurance: 'annual', insuranceEnds: '2027-01-01', trips: [t1, t2] };
+    data = addDoc(data, 't1', 'insurance', { id: 'single', uri: 'file:///s.jpg', addedAt: '2026-11-23T12:00:00Z' });
+    expect(data.insuranceDocs ?? []).toEqual([]);
+    expect(docsFor(data, data.trips[0], 'insurance').map((d) => d.id)).toEqual(['single']);
+    expect(docsFor(data, data.trips[1], 'insurance')).toEqual([]);
+  });
+});

@@ -189,8 +189,11 @@ export function setPrep(data: AppData, tripId: string, kind: PrepKind, status: P
 }
 
 /** Where a task's document photos live: the household policy, or the trip. */
-function docsOwner(data: AppData, kind: 'insurance' | 'visa'): 'household' | 'trip' {
-  return kind === 'insurance' && (data.insurance === 'annual' || data.insurance === 'card') ? 'household' : 'trip';
+function docsOwner(data: AppData, trip: Trip | undefined, kind: 'insurance' | 'visa'): 'household' | 'trip' {
+  if (kind !== 'insurance' || !trip) return 'trip';
+  // The household policy, while it covers this trip. Cover bought because
+  // the policy ends first belongs to this trip only.
+  return prepTasks(trip, data).find((t) => t.kind === 'insurance')?.status === 'covered' ? 'household' : 'trip';
 }
 
 /** Photos for a task. */
@@ -201,7 +204,7 @@ export function docsFor(data: AppData, trip: Trip, kind: 'insurance' | 'visa'): 
 }
 
 export function addDoc(data: AppData, tripId: string, kind: 'insurance' | 'visa', doc: Ticket): AppData {
-  if (docsOwner(data, kind) === 'household') return { ...data, insuranceDocs: [...(data.insuranceDocs ?? []), doc] };
+  if (docsOwner(data, data.trips.find((t) => t.id === tripId), kind) === 'household') return { ...data, insuranceDocs: [...(data.insuranceDocs ?? []), doc] };
   return {
     ...data,
     trips: data.trips.map((t) =>

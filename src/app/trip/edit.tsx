@@ -214,6 +214,9 @@ export default function EditTrip() {
       return;
     }
     const trip: Trip = {
+      // Keep everything else the trip holds (insurance and visa answers,
+      // document photos, visa expiry); the fields below are what this form edits.
+      ...existing,
       id: existing?.id ?? newId(),
       name: name.trim() || 'My trip',
       flight: draft.flight,
