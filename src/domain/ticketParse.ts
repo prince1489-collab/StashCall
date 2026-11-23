@@ -153,8 +153,11 @@ export function parseTicketText(blocks: string[], today: Date = new Date()): Tic
   const date = findDates(flightText)[0];
   if (date) {
     const arrives = flightText.search(/\barriv/i);
+    // "19.02.2027" also looks like the time 19:02, so skip times inside a date.
+    const dates = findDates(flightText);
+    const insideDate = (t: Found<string>) => dates.some((f) => t.index < f.end && t.end > f.index);
     const candidates = findTimes(flightText).filter(
-      (t) => t.index >= date.index - 40 && !NOT_DEPARTURE.test(lineAt(flightText, t.index)),
+      (t) => t.index >= date.index - 40 && !insideDate(t) && !NOT_DEPARTURE.test(lineAt(flightText, t.index)),
     );
     const time =
       candidates.find((t) => arrives === -1 || t.index < arrives || arrives < date.index) ?? candidates[0];

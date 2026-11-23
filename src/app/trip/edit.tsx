@@ -76,6 +76,8 @@ export default function EditTrip() {
   const [reading, setReading] = useState(false);
   const [readNote, setReadNote] = useState<string | null>(null);
   const saved = useRef(false);
+  // False while the flight is still the blank form's placeholder.
+  const flightTouched = useRef(false);
   const addedRef = useRef(added);
   addedRef.current = added;
   useEffect(
@@ -93,10 +95,12 @@ export default function EditTrip() {
     const draft = draftFromTicket(d, deviceZone());
     setName((n) => n.trim() || draft.name);
     if (draft.flight) {
+      flightTouched.current = true;
       setHasFlight(true);
       setFlight(draft.flight);
-    } else if (!existing) {
-      // A hotel-only booking: don't keep the made-up flight from a blank form.
+    } else if (!existing && !flightTouched.current) {
+      // A hotel-only booking: don't keep the made-up flight from a blank form,
+      // but keep a flight the user typed or read from an earlier screenshot.
       setHasFlight(false);
     }
     if (draft.checkout) {
@@ -129,7 +133,10 @@ export default function EditTrip() {
   const draft = { flight: hasFlight ? flight : undefined, checkout: hasCheckout ? checkout : undefined };
   const preview = useMemo(() => buildTimeline(draft), [hasFlight, flight, hasCheckout, checkout]); // eslint-disable-line react-hooks/exhaustive-deps
 
-  const setF = (patch: Partial<FlightLeg>) => setFlight((f) => ({ ...f, ...patch }));
+  const setF = (patch: Partial<FlightLeg>) => {
+    flightTouched.current = true;
+    setFlight((f) => ({ ...f, ...patch }));
+  };
   const setC = (patch: Partial<HotelCheckout>) => setCheckout((c) => ({ ...c, ...patch }));
 
   const setInternational = (international: boolean) => {
