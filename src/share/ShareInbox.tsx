@@ -4,6 +4,7 @@ import { useEffect } from 'react';
 import { Alert } from 'react-native';
 
 import { hasTripDetails, type TicketDetails } from '../domain/ticketParse';
+import { isReturnOf } from '../domain/ticketDraft';
 import { addTickets } from '../domain/tickets';
 import { buildTimeline } from '../domain/timeline';
 import type { Ticket, Trip } from '../domain/types';
@@ -16,7 +17,8 @@ import { readProblem, readTicket } from '../tickets/readTicket';
 function sameTrip(trip: Trip, d: TicketDetails): boolean {
   return (
     (!!d.departure && trip.flight?.departure === d.departure) ||
-    (!!d.checkout && trip.checkout?.checkout === d.checkout)
+    (!!d.checkout && trip.checkout?.checkout === d.checkout) ||
+    (!!d.departure && trip.returnFlight?.departure === d.departure)
   );
 }
 
@@ -68,6 +70,21 @@ export function ShareInbox() {
         problem = readProblem(r);
         text = r.text;
         if (hasTripDetails(details)) break;
+      }
+
+      // Just the flight home for the current trip: add it to that trip.
+      if (
+        currentTrip?.flight &&
+        !currentTrip.returnFlight &&
+        !details.returnFlight &&
+        !details.checkout &&
+        isReturnOf(currentTrip.flight, details)
+      ) {
+        router.push({
+          pathname: '/trip/edit',
+          params: { tickets: JSON.stringify(kept), details: JSON.stringify(details), ...(text && { text }) },
+        });
+        return;
       }
 
       const keepWithCurrent =

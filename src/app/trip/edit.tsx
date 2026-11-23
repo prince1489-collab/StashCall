@@ -4,7 +4,7 @@ import { ActivityIndicator, Alert, ScrollView, StyleSheet, Text, TextInput, View
 
 import { DEFAULTS } from '../../domain/defaults';
 import { savedItems } from '../../domain/household';
-import { draftFromTicket } from '../../domain/ticketDraft';
+import { draftFromTicket, flightLeg, isReturnOf } from '../../domain/ticketDraft';
 import { describeTicket, hasTripDetails, type TicketDetails } from '../../domain/ticketParse';
 import { buildTimeline, defaultFlight } from '../../domain/timeline';
 import type { FlightLeg, HotelCheckout, Ticket, Trip } from '../../domain/types';
@@ -69,6 +69,10 @@ export default function EditTrip() {
   );
   const [hasCheckout, setHasCheckout] = useState(!!existing?.checkout);
   const [checkout, setCheckout] = useState<HotelCheckout>(existing?.checkout ?? newCheckout());
+  const [hasReturn, setHasReturn] = useState(!!existing?.returnFlight);
+  const [returnFlight, setReturnFlight] = useState<FlightLeg>(
+    existing?.returnFlight ?? defaultFlight(localDaysFromNow(14, 10), deviceZone(), true),
+  );
 
   // Ticket screenshots added on this screen. They're deleted again if the
   // trip isn't saved, so a cancelled form leaves nothing behind.
@@ -98,6 +102,15 @@ export default function EditTrip() {
       );
       return;
     }
+    // A screenshot of just the flight home, for a trip that already has its
+    // outbound flight: fill in the flight home and leave the rest alone.
+    const outbound = hasFlight && (existing?.flight || flightTouched.current) ? flight : undefined;
+    if (outbound && !d.returnFlight && !d.checkout && isReturnOf(outbound, d)) {
+      setHasReturn(true);
+      setReturnFlight(flightLeg(d, hasCheckout ? checkout.timeZone : deviceZone(), hasCheckout && !!checkout.timeZoneConfirmed));
+      setReadNote(`Added your flight home: ${describeTicket(d, formatLocalDate)}. Check the times before saving.`);
+      return;
+    }
     const draft = draftFromTicket(d, deviceZone());
     setName((n) => n.trim() || draft.name);
     if (draft.flight) {
@@ -112,6 +125,10 @@ export default function EditTrip() {
     if (draft.checkout) {
       setHasCheckout(true);
       setCheckout(draft.checkout);
+    }
+    if (draft.returnFlight) {
+      setHasReturn(true);
+      setReturnFlight(draft.returnFlight);
     }
     setReadNote(`Filled in from your screenshot: ${describeTicket(d, formatLocalDate)}. Check the times before saving.`);
   };
@@ -140,8 +157,13 @@ export default function EditTrip() {
     }
   };
 
-  const draft = { flight: hasFlight ? flight : undefined, checkout: hasCheckout ? checkout : undefined };
-  const preview = useMemo(() => buildTimeline(draft), [hasFlight, flight, hasCheckout, checkout]); // eslint-disable-line react-hooks/exhaustive-deps
+  const draft = {
+    flight: hasFlight ? flight : undefined,
+    checkout: hasCheckout ? checkout : undefined,
+    returnFlight: hasReturn ? returnFlight : undefined,
+  };
+  const preview = useMemo(() => buildTimeline(draft), [hasFlight, flight, hasCheckout, checkout, hasReturn, returnFlight]); // eslint-disable-line react-hooks/exhaustive-deps
+  const setR = (patch: Partial<FlightLeg>) => setReturnFlight((f) => ({ ...f, ...patch }));
 
   const setF = (patch: Partial<FlightLeg>) => {
     flightTouched.current = true;
@@ -164,6 +186,8 @@ export default function EditTrip() {
   // Abroad, the phone's zone is usually the wrong guess for the hotel, and a
   // wrong zone moves the sweep and checkout reminders by hours. Make it a choice.
   const zoneUnset = hasCheckout && hasFlight && flight.international && !checkout.timeZoneConfirmed;
+  // Same for the flight home: it leaves from wherever you are staying.
+  const returnZoneUnset = hasReturn && hasFlight && flight.international && !returnFlight.timeZoneConfirmed;
 
   const save = async () => {
     if (!hasFlight && !hasCheckout) {
@@ -174,11 +198,19 @@ export default function EditTrip() {
       Alert.alert("Choose the hotel's time zone", 'Pick where the hotel is, so the checkout reminders arrive on time.');
       return;
     }
+    if (returnZoneUnset) {
+      Alert.alert(
+        'Where do you fly home from?',
+        'Pick the time zone you fly home from, so those reminders arrive on time.',
+      );
+      return;
+    }
     const trip: Trip = {
       id: existing?.id ?? newId(),
       name: name.trim() || 'My trip',
       flight: draft.flight,
       checkout: draft.checkout,
+      returnFlight: draft.returnFlight,
       // A new trip starts with every saved item; the Items tab can take some off.
       itemIds: existing?.itemIds ?? savedItems(data.items).map((i) => i.id),
       ticked: existing?.ticked ?? {},
@@ -331,12 +363,61 @@ export default function EditTrip() {
         ) : null}
       </Section>
 
+      <Section title="Flight home">
+        <SwitchRow
+          label="I'm flying home"
+          hint="Plans the day you leave, from the hotel"
+          value={hasReturn}
+          onChange={setHasReturn}
+        />
+        {hasReturn ? (
+          <>
+            <DateTimeRow
+              label="Departs"
+              hint={returnFlight.airport ? `${returnFlight.airport}, ${zoneLabel(returnFlight.timeZone)} time` : undefined}
+              value={returnFlight.departure}
+              onChange={(departure) => setR({ departure })}
+            />
+            <ZoneRow
+              label="Flying home from"
+              hint="The time zone of that airport"
+              title="Flying home from"
+              value={returnFlight.timeZone}
+              unset={returnZoneUnset}
+              onChange={(timeZone) => setR({ timeZone, timeZoneConfirmed: true })}
+            />
+            <MinutesStepper
+              label="Hotel to airport"
+              value={returnFlight.travelMinutes}
+              onChange={(travelMinutes) => setR({ travelMinutes })}
+              min={15}
+            />
+            <MinutesStepper
+              label="At the airport early"
+              hint="Before departure"
+              value={returnFlight.bufferMinutes}
+              onChange={(bufferMinutes) => setR({ bufferMinutes })}
+              min={30}
+            />
+          </>
+        ) : null}
+      </Section>
+
       {preview.length > 0 ? (
         <View style={formStyles.section}>
           <Text style={formStyles.sectionTitle}>Your plan</Text>
           {inPast ? <Text style={styles.warn}>These times are in the past.</Text> : null}
           {zoneUnset ? <Text style={styles.warn}>Checkout times will show once you choose the hotel's time zone.</Text> : null}
-          <Timeline steps={zoneUnset ? preview.filter((s) => s.kind !== 'sweep' && s.kind !== 'checkout') : preview} />
+          {returnZoneUnset ? (
+            <Text style={styles.warn}>Your flight home will show once you choose where you fly home from.</Text>
+          ) : null}
+          <Timeline
+            steps={preview.filter(
+              (s) =>
+                !(zoneUnset && (s.kind === 'sweep' || s.kind === 'checkout')) &&
+                !(returnZoneUnset && ['returnPack', 'returnWake', 'returnLeaveCheck', 'returnLeave', 'returnAirport', 'returnTakeoff'].includes(s.kind)),
+            )}
+          />
         </View>
       ) : null}
 

@@ -13,6 +13,8 @@ export interface TicketDetails {
   departure?: LocalDateTime;
   /** Hotel checkout, in the hotel's wall-clock time. */
   checkout?: LocalDateTime;
+  /** The flight home, when the booking has one. */
+  returnFlight?: Pick<TicketDetails, 'flightNumber' | 'from' | 'to' | 'departure'>;
 }
 
 const MONTHS = ['jan', 'feb', 'mar', 'apr', 'may', 'jun', 'jul', 'aug', 'sep', 'oct', 'nov', 'dec'];
@@ -152,15 +154,56 @@ function findCheckout(text: string, today: Date): LocalDateTime | undefined {
  */
 export function parseTicketText(blocks: string[], today: Date = new Date()): TicketDetails {
   const text = fixOcrDigits(blocks.join('\n'));
-  const details: TicketDetails = {};
+  const flightText = text.replace(/check[\s-]?out[\s\S]*$/i, '');
 
-  const airports = findAirports(text);
+  // A booking with an outbound and a return flight lists two flight numbers.
+  // Read each part on its own, then take the earliest as the outbound.
+  const flights = splitByFlight(flightText)
+    .map((part) => parseFlight(part, today))
+    .filter((f): f is FlightDetails => !!f.departure)
+    .sort((a, b) => (a.departure! < b.departure! ? -1 : 1));
+
+  const details: TicketDetails = {};
+  if (flights.length >= 2) {
+    Object.assign(details, flights[0]);
+    details.returnFlight = flights[flights.length - 1];
+  } else {
+    Object.assign(details, parseFlight(flightText, today));
+  }
+
+  const checkout = findCheckout(text, today);
+  if (checkout) details.checkout = checkout;
+  return details;
+}
+
+/** One flight's worth of details. */
+export type FlightDetails = Pick<TicketDetails, 'flightNumber' | 'from' | 'to' | 'departure'>;
+
+/**
+ * Splits text at each distinct flight number ("BA137 … BA138 …"). Returns
+ * the whole text when there's one flight or none.
+ */
+function splitByFlight(text: string): string[] {
+  const seen = new Set<string>();
+  const starts: number[] = [];
+  for (const m of text.matchAll(/\b([A-Z]{2})\s?(\d{1,4})\b/g)) {
+    const code = `${m[1]}${m[2]}`;
+    if (/^(AM|PM|NO|TO|OF|ON|AT|IN|BY)$/.test(m[1]) || seen.has(code)) continue;
+    seen.add(code);
+    starts.push(m.index);
+  }
+  if (starts.length < 2) return [text];
+  return starts.map((start, i) => text.slice(i === 0 ? 0 : start, starts[i + 1] ?? text.length));
+}
+
+function parseFlight(flightText: string, today: Date): FlightDetails {
+  const details: FlightDetails = {};
+  const airports = findAirports(flightText);
   if (airports[0]) details.from = airports[0];
   if (airports[1]) details.to = airports[1];
 
   // Departure: the first date, then the first time after it that isn't a
   // boarding, gate or arrival time. Look at the part before "Arrives" first.
-  const flightText = text.replace(/check[\s-]?out[\s\S]*$/i, '');
   const date = findDates(flightText)[0];
   if (date) {
     const arrives = flightText.search(/\barriv/i);
@@ -176,9 +219,6 @@ export function parseTicketText(blocks: string[], today: Date = new Date()): Tic
     if (isFlight) details.departure = local(withYear(date.value, today), time.value);
   }
   if (details.departure) details.flightNumber = findFlightNumber(flightText);
-
-  const checkout = findCheckout(text, today);
-  if (checkout) details.checkout = checkout;
   return details;
 }
 
@@ -205,6 +245,8 @@ export function describeTicket(d: TicketDetails, formatDay: (local: LocalDateTim
   if (d.from && d.to) parts.push(`${d.from.code} → ${d.to.code}`);
   else if (d.from) parts.push(`from ${d.from.code}`);
   if (d.departure) parts.push(`${formatDay(d.departure)}, ${d.departure.slice(11)}`);
+  if (d.returnFlight?.departure)
+    parts.push(`home ${d.returnFlight.flightNumber ?? ''} ${formatDay(d.returnFlight.departure)}, ${d.returnFlight.departure.slice(11)}`.replace('  ', ' '));
   if (d.checkout) parts.push(`checkout ${formatDay(d.checkout)}, ${d.checkout.slice(11)}`);
   return parts.join(' · ');
 }

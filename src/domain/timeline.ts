@@ -10,10 +10,11 @@ import type { FlightLeg, HotelCheckout, StepKind, TimelineStep, Trip } from './t
  * flagged `estimate: true` so the UI can label it and the user can adjust
  * the assumptions behind it.
  */
-export function buildTimeline(trip: Pick<Trip, 'flight' | 'checkout'>): TimelineStep[] {
+export function buildTimeline(trip: Pick<Trip, 'flight' | 'checkout' | 'returnFlight'>): TimelineStep[] {
   const steps: TimelineStep[] = [];
   if (trip.flight) steps.push(...flightSteps(trip.flight));
   if (trip.checkout) steps.push(...checkoutSteps(trip.checkout));
+  if (trip.returnFlight) steps.push(...returnFlightSteps(trip.returnFlight));
   return steps.sort((a, b) => a.at.getTime() - b.at.getTime());
 }
 
@@ -59,6 +60,26 @@ export function flightSteps(f: FlightLeg): TimelineStep[] {
     step('airport', 'Arrive at the airport', airport, tz),
     step('takeoff', 'Flight departs', takeoff, tz, { estimate: false }),
   ];
+}
+
+/**
+ * The flight home: the same backwards plan, but from the hotel, so the
+ * reminders name the items to collect there ("checkout" items).
+ */
+export function returnFlightSteps(f: FlightLeg): TimelineStep[] {
+  const map: Record<string, { kind: StepKind; title: string }> = {
+    pack: { kind: 'returnPack', title: 'Pack to go home' },
+    wake: { kind: 'returnWake', title: 'Wake up' },
+    leaveCheck: { kind: 'returnLeaveCheck', title: 'Last check of the room' },
+    leave: { kind: 'returnLeave', title: 'Leave for the airport' },
+    airport: { kind: 'returnAirport', title: 'Arrive at the airport' },
+    takeoff: { kind: 'returnTakeoff', title: 'Flight home departs' },
+  };
+  return flightSteps(f).map((s) => ({
+    ...s,
+    ...map[s.kind],
+    itemMoment: s.itemMoment ? 'checkout' : undefined,
+  }));
 }
 
 export function checkoutSteps(c: HotelCheckout): TimelineStep[] {

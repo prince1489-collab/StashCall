@@ -60,6 +60,27 @@ function textFor(step: TimelineStep, steps: TimelineStep[], items: string[]): { 
         }`,
       };
     }
+    case 'returnPack':
+      return {
+        title: 'Pack to go home',
+        body: list ? `Don't leave behind: ${list}.` : 'Pack tonight so the morning is calm.',
+      };
+    case 'returnWake': {
+      const leave = find('returnLeave');
+      return { title: 'Time to get up', body: leave ? `Leave for the airport at ${leave.localTime}.` : 'Flying home today.' };
+    }
+    case 'returnLeaveCheck':
+      return {
+        title: 'Last check of the room',
+        body: list ? `Have you got: ${list}?` : 'Check drawers, sockets, the safe and the bathroom.',
+      };
+    case 'returnLeave': {
+      const takeoff = find('returnTakeoff');
+      return {
+        title: 'Time to leave for the airport',
+        body: takeoff ? `Your flight home departs at ${takeoff.localTime}.` : 'Time to go.',
+      };
+    }
     default:
       return null;
   }
@@ -79,7 +100,7 @@ export function planReminders(trip: Trip, items: Item[], now: Date): PlannedRemi
         at: s.at,
         ...text,
         kind: s.kind,
-        critical: s.kind === 'wake' || s.kind === 'leave',
+        critical: ['wake', 'leave', 'returnWake', 'returnLeave'].includes(s.kind),
         tripId: trip.id,
         hasItems: names.length > 0,
       };

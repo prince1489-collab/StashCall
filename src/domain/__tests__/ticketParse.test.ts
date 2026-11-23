@@ -123,3 +123,59 @@ describe('OCR slips', () => {
     expect(fixOcrDigits('Hello OK:ok 1O:3O')).toBe('Hello OK:ok 10:30');
   });
 });
+
+describe('return flights', () => {
+  it('reads an outbound and a return flight from one booking', () => {
+    const blocks = [
+      'Your booking',
+      'BA137 London to Mumbai',
+      'Departs: Friday, 5 February 2027',
+      'Heathrow 09:40 LHR - Terminal 5',
+      'Arrives: Saturday, 6 February 2027',
+      'Mumbai 00:05 BOM - Terminal 2',
+      'BA138 Mumbai to London',
+      'Departs: Friday, 19 February 2027',
+      'Chhatrapati Shivaji Maharaj Intl 02:15 BOM - Terminal 2',
+      'Arrives: Friday, 19 February 2027',
+      'Heathrow 07:05 LHR - Terminal 5',
+    ];
+    const d = parseTicketText(blocks, today);
+    expect(d.flightNumber).toBe('BA137');
+    expect(d.from?.code).toBe('LHR');
+    expect(d.to?.code).toBe('BOM');
+    expect(d.departure).toBe('2027-02-05T09:40');
+    expect(d.returnFlight?.flightNumber).toBe('BA138');
+    expect(d.returnFlight?.from?.code).toBe('BOM');
+    expect(d.returnFlight?.departure).toBe('2027-02-19T02:15');
+    expect(suggestTripName(d)).toBe('Mumbai in February');
+  });
+
+  it('keeps a single flight as the outbound', () => {
+    const d = parseTicketText(['BA138', 'BOM LHR', '19 Feb 2027', 'Departs 02:15'], today);
+    expect(d.returnFlight).toBeUndefined();
+  });
+});
+
+describe('return flight drafts', () => {
+  it('makes a return leg in the departure airport zone', async () => {
+    const { draftFromTicket } = await import('../ticketDraft');
+    const d = parseTicketText(
+      ['BA137 LHR BOM', 'Departs 5 Feb 2027 09:40', 'BA138 BOM LHR', 'Departs 19 Feb 2027 02:15'],
+      today,
+    );
+    const draft = draftFromTicket(d, 'Europe/London');
+    expect(draft.flight?.timeZone).toBe('Europe/London');
+    expect(draft.returnFlight?.timeZone).toBe('Asia/Kolkata');
+    expect(draft.returnFlight?.departure).toBe('2027-02-19T02:15');
+    expect(draft.returnFlight?.timeZoneConfirmed).toBe(true);
+  });
+
+  it('spots a separate screenshot of the flight home', async () => {
+    const { flightLeg, isReturnOf } = await import('../ticketDraft');
+    const out = parseTicketText(['BA137', 'LHR BOM', '5 Feb 2027', 'Departs 09:40'], today);
+    const home = parseTicketText(['BA138', 'BOM LHR', '19 Feb 2027', 'Departs 02:15'], today);
+    const outbound = flightLeg(out, 'Europe/London');
+    expect(isReturnOf(outbound, home)).toBe(true);
+    expect(isReturnOf(outbound, out)).toBe(false);
+  });
+});

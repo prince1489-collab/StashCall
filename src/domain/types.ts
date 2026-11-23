@@ -50,7 +50,12 @@ export interface FlightLeg {
   getReadyMinutes: number;
   /** Evening-before packing reminder time. */
   packTime: LocalTime;
+  /** IATA code of the departure airport, e.g. "LHR". */
   airport?: string;
+  /** IATA code of the arrival airport, when known. */
+  destination?: string;
+  /** For a flight home: true once the user has confirmed its zone. */
+  timeZoneConfirmed?: boolean;
 }
 
 export interface HotelCheckout {
@@ -76,6 +81,8 @@ export interface Trip {
   /** A trip may have a flight, a hotel checkout, or both. */
   flight?: FlightLeg;
   checkout?: HotelCheckout;
+  /** The flight home, planned from the hotel rather than from home. */
+  returnFlight?: FlightLeg;
   /** Items chosen for this trip (ids into the household item list). */
   itemIds: string[];
   /** Screenshots of tickets, boarding passes or bookings, kept on the phone. */
@@ -93,7 +100,13 @@ export type StepKind =
   | 'airport'
   | 'takeoff'
   | 'sweep'
-  | 'checkout';
+  | 'checkout'
+  | 'returnPack'
+  | 'returnWake'
+  | 'returnLeaveCheck'
+  | 'returnLeave'
+  | 'returnAirport'
+  | 'returnTakeoff';
 
 export interface TimelineStep {
   kind: StepKind;
