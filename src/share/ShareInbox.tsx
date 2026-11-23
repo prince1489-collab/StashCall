@@ -3,16 +3,33 @@ import { useShareIntentContext } from 'expo-share-intent';
 import { useEffect } from 'react';
 import { Alert } from 'react-native';
 
+import { hasTripDetails, type TicketDetails } from '../domain/ticketParse';
 import { addTickets } from '../domain/tickets';
-import type { Ticket } from '../domain/types';
+import { buildTimeline } from '../domain/timeline';
+import type { Ticket, Trip } from '../domain/types';
 import { useAppData } from '../state/AppData';
 import { keepTicket } from '../storage/photos';
 import { newId } from '../storage/store';
+import { readTicket } from '../tickets/readTicket';
+
+/** True when the screenshot is about the trip we already have. */
+function sameTrip(trip: Trip, d: TicketDetails): boolean {
+  return (
+    (!!d.departure && trip.flight?.departure === d.departure) ||
+    (!!d.checkout && trip.checkout?.checkout === d.checkout)
+  );
+}
+
+function tripIsOver(trip: Trip): boolean {
+  const steps = buildTimeline(trip);
+  return steps.length === 0 || steps[steps.length - 1].at.getTime() < Date.now();
+}
 
 /**
  * Receives images shared to StashCall from another app (Gallery, WhatsApp,
- * an airline app) and keeps them as tickets on the current trip.
- * Renders nothing.
+ * an airline app). Each is read on the phone: a ticket for a new flight or
+ * stay opens a filled-in new trip; otherwise the images are kept with the
+ * current trip. Renders nothing.
  */
 export function ShareInbox() {
   const { hasShareIntent, shareIntent, resetShareIntent } = useShareIntentContext();
@@ -25,10 +42,6 @@ export function ShareInbox() {
 
     if (images.length === 0) {
       Alert.alert('Share an image', 'StashCall can keep screenshots of tickets and bookings. Share a picture instead.');
-      return;
-    }
-    if (!currentTrip) {
-      Alert.alert('Add a trip first', 'Then share your ticket again and StashCall will keep it with the trip.');
       return;
     }
 
@@ -44,13 +57,33 @@ export function ShareInbox() {
       Alert.alert("Couldn't save that", 'Try again, or add the screenshot from the Trip tab.');
       return;
     }
-    update((d) => addTickets(d, currentTrip.id, kept)).then(() => {
+
+    (async () => {
+      let details: TicketDetails = {};
+      for (const t of kept) {
+        details = await readTicket(t.uri);
+        if (hasTripDetails(details)) break;
+      }
+
+      const keepWithCurrent =
+        currentTrip && (hasTripDetails(details) ? sameTrip(currentTrip, details) : !tripIsOver(currentTrip));
+      if (!currentTrip || !keepWithCurrent) {
+        // A new flight or stay, or nothing current to keep it with: start a
+        // new trip, filled in from the screenshot, for the user to check and save.
+        router.push({
+          pathname: '/trip/edit',
+          params: { new: '1', tickets: JSON.stringify(kept), details: JSON.stringify(details) },
+        });
+        return;
+      }
+
+      await update((d) => addTickets(d, currentTrip.id, kept));
       router.navigate('/trip');
       Alert.alert(
         kept.length === 1 ? 'Ticket saved' : `${kept.length} tickets saved`,
         `Kept with ${currentTrip.name}. It's on the Trip tab, and on Today too.`,
       );
-    });
+    })();
   }, [ready, hasShareIntent, shareIntent, resetShareIntent, currentTrip, update]);
 
   return null;

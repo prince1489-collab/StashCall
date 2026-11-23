@@ -64,7 +64,13 @@ export default function Today() {
           ) : null}
         </View>
       ) : (
-        <Text style={styles.emptyText}>This trip is over. Add your next one from the Trip tab.</Text>
+        <View style={styles.overBox}>
+          <Text style={styles.emptyText}>This trip is over.</Text>
+          <PrimaryButton
+            label="Plan your next trip"
+            onPress={() => router.push({ pathname: '/trip/edit', params: { new: '1' } })}
+          />
+        </View>
       )}
       <Tickets trip={currentTrip} compact />
       <ReminderStatus />
@@ -95,5 +101,6 @@ const styles = StyleSheet.create({
   empty: { flex: 1, justifyContent: 'center', padding: space.xl, gap: space.l },
   brand: { fontSize: 15, fontWeight: '700', color: colors.accent },
   emptyTitle: { fontSize: 26, fontWeight: '700', color: colors.text },
+  overBox: { gap: space.l },
   emptyText: { fontSize: 16, color: colors.muted, lineHeight: 22 },
 });

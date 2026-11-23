@@ -1,12 +1,16 @@
-import { router } from 'expo-router';
-import { useMemo, useState } from 'react';
-import { Alert, ScrollView, StyleSheet, Text, TextInput, View } from 'react-native';
+import { router, useLocalSearchParams } from 'expo-router';
+import { useEffect, useMemo, useRef, useState } from 'react';
+import { ActivityIndicator, Alert, ScrollView, StyleSheet, Text, TextInput, View } from 'react-native';
 
 import { DEFAULTS } from '../../domain/defaults';
 import { savedItems } from '../../domain/household';
+import { draftFromTicket } from '../../domain/ticketDraft';
+import { describeTicket, hasTripDetails, type TicketDetails } from '../../domain/ticketParse';
 import { buildTimeline, defaultFlight } from '../../domain/timeline';
-import type { FlightLeg, HotelCheckout, Trip } from '../../domain/types';
+import type { FlightLeg, HotelCheckout, Ticket, Trip } from '../../domain/types';
+import { deletePhoto, pickTicket } from '../../storage/photos';
 import { newId } from '../../storage/store';
+import { readTicket } from '../../tickets/readTicket';
 import { useReminders } from '../../reminders/Reminders';
 import { useAppData } from '../../state/AppData';
 import {
@@ -18,7 +22,9 @@ import {
   TimeRow,
   ZoneRow,
   deviceZone,
+  formatLocalDate,
   styles as formStyles,
+  zoneLabel,
 } from '../../ui/Form';
 import { Timeline } from '../../ui/Timeline';
 import { colors, space } from '../../ui/theme';
@@ -29,6 +35,17 @@ function localDaysFromNow(days: number, hour: number): string {
   const d = new Date();
   d.setDate(d.getDate() + days);
   return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}T${pad(hour)}:00`;
+}
+
+/** Route params: `new=1` starts a blank trip; `tickets` and `details` come from a shared screenshot. */
+type Params = { new?: string; tickets?: string; details?: string };
+
+function fromJson<T>(s?: string): T | undefined {
+  try {
+    return s ? (JSON.parse(s) as T) : undefined;
+  } catch {
+    return undefined;
+  }
 }
 
 function newCheckout(): HotelCheckout {
@@ -42,7 +59,8 @@ function newCheckout(): HotelCheckout {
 export default function EditTrip() {
   const { data, currentTrip, saveTrip, deleteTrip } = useAppData();
   const { askPermission } = useReminders();
-  const existing = currentTrip;
+  const params = useLocalSearchParams<Params>();
+  const existing = params.new === '1' ? undefined : currentTrip;
 
   const [name, setName] = useState(existing?.name ?? '');
   const [hasFlight, setHasFlight] = useState(existing ? !!existing.flight : true);
@@ -51,6 +69,62 @@ export default function EditTrip() {
   );
   const [hasCheckout, setHasCheckout] = useState(!!existing?.checkout);
   const [checkout, setCheckout] = useState<HotelCheckout>(existing?.checkout ?? newCheckout());
+
+  // Ticket screenshots added on this screen. They're deleted again if the
+  // trip isn't saved, so a cancelled form leaves nothing behind.
+  const [added, setAdded] = useState<Ticket[]>([]);
+  const [reading, setReading] = useState(false);
+  const [readNote, setReadNote] = useState<string | null>(null);
+  const saved = useRef(false);
+  const addedRef = useRef(added);
+  addedRef.current = added;
+  useEffect(
+    () => () => {
+      if (!saved.current) for (const t of addedRef.current) deletePhoto(t.uri);
+    },
+    [],
+  );
+
+  const applyTicket = (d: TicketDetails) => {
+    if (!hasTripDetails(d)) {
+      setReadNote("Couldn't find a flight or checkout time in that screenshot. It's kept with the trip; fill in the times below.");
+      return;
+    }
+    const draft = draftFromTicket(d, deviceZone());
+    setName((n) => n.trim() || draft.name);
+    if (draft.flight) {
+      setHasFlight(true);
+      setFlight(draft.flight);
+    } else if (!existing) {
+      // A hotel-only booking: don't keep the made-up flight from a blank form.
+      setHasFlight(false);
+    }
+    if (draft.checkout) {
+      setHasCheckout(true);
+      setCheckout(draft.checkout);
+    }
+    setReadNote(`Filled in from your screenshot: ${describeTicket(d, formatLocalDate)}. Check the times before saving.`);
+  };
+
+  // A screenshot shared to StashCall arrives already read.
+  useEffect(() => {
+    const shared = fromJson<Ticket[]>(params.tickets);
+    if (!shared?.length) return;
+    setAdded(shared);
+    applyTicket(fromJson<TicketDetails>(params.details) ?? {});
+  }, []); // eslint-disable-line react-hooks/exhaustive-deps
+
+  const fillFromScreenshot = async () => {
+    const uri = await pickTicket();
+    if (!uri) return;
+    setAdded((a) => [...a, { id: newId(), uri, addedAt: new Date().toISOString() }]);
+    setReading(true);
+    try {
+      applyTicket(await readTicket(uri));
+    } finally {
+      setReading(false);
+    }
+  };
 
   const draft = { flight: hasFlight ? flight : undefined, checkout: hasCheckout ? checkout : undefined };
   const preview = useMemo(() => buildTimeline(draft), [hasFlight, flight, hasCheckout, checkout]); // eslint-disable-line react-hooks/exhaustive-deps
@@ -91,9 +165,10 @@ export default function EditTrip() {
       // A new trip starts with every saved item; the Items tab can take some off.
       itemIds: existing?.itemIds ?? savedItems(data.items).map((i) => i.id),
       ticked: existing?.ticked ?? {},
-      tickets: existing?.tickets,
+      tickets: [...(existing?.tickets ?? []), ...added],
       createdAt: existing?.createdAt ?? new Date().toISOString(),
     };
+    saved.current = true;
     await saveTrip(trip);
     // Ask at the moment it obviously matters: right after planning a trip.
     await askPermission();
@@ -119,6 +194,23 @@ export default function EditTrip() {
 
   return (
     <ScrollView contentContainerStyle={styles.container} keyboardShouldPersistTaps="handled">
+      <View style={styles.fillBox}>
+        {reading ? (
+          <View style={styles.readingRow}>
+            <ActivityIndicator color={colors.accent} />
+            <Text style={styles.fillHint}>Reading your screenshot…</Text>
+          </View>
+        ) : (
+          <Text style={styles.fillLink} onPress={fillFromScreenshot} accessibilityRole="button">
+            Fill in from a ticket screenshot
+          </Text>
+        )}
+        <Text style={styles.fillHint}>
+          {readNote ??
+            'Pick a booking email, boarding pass or hotel booking. StashCall reads it on your phone and keeps it with the trip.'}
+        </Text>
+      </View>
+
       <Section title="Trip name">
         <TextInput
           value={name}
@@ -137,7 +229,16 @@ export default function EditTrip() {
         <SwitchRow label="I'm flying" value={hasFlight} onChange={setHasFlight} />
         {hasFlight ? (
           <>
-            <DateTimeRow label="Departs" value={flight.departure} onChange={(departure) => setF({ departure })} />
+            <DateTimeRow
+              label="Departs"
+              hint={
+                flight.timeZone !== deviceZone()
+                  ? `${flight.airport ? `${flight.airport}, ` : ''}${zoneLabel(flight.timeZone)} time`
+                  : undefined
+              }
+              value={flight.departure}
+              onChange={(departure) => setF({ departure })}
+            />
             <SwitchRow label="International" value={flight.international} onChange={setInternational} />
             <MinutesStepper
               label="Home to airport"
@@ -221,6 +322,18 @@ const styles = StyleSheet.create({
   container: { padding: space.l, paddingBottom: 48 },
   input: { flex: 1, fontSize: 16, color: colors.text, textAlign: 'right' },
   name: { textAlign: 'left', paddingHorizontal: space.l, paddingVertical: 14 },
+  fillBox: {
+    backgroundColor: colors.card,
+    borderRadius: 12,
+    padding: space.l,
+    marginBottom: space.l,
+    borderWidth: StyleSheet.hairlineWidth,
+    borderColor: colors.border,
+    gap: space.xs,
+  },
+  fillLink: { fontSize: 16, color: colors.accent, fontWeight: '600' },
+  fillHint: { fontSize: 14, color: colors.muted, lineHeight: 20 },
+  readingRow: { flexDirection: 'row', alignItems: 'center', gap: space.s },
   warn: { color: colors.warn, marginBottom: space.s },
   delete: { color: colors.danger, textAlign: 'center', fontSize: 16, marginTop: space.xl, padding: space.s },
 });

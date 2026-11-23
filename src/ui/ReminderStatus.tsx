@@ -1,7 +1,8 @@
-import { Alert, Linking, StyleSheet, Text, View } from 'react-native';
+import Constants from 'expo-constants';
+import { Alert, Linking, Platform, StyleSheet, Text, View } from 'react-native';
 
 import { useReminders } from '../reminders/Reminders';
-import { sendTestReminder } from '../reminders/schedule';
+import { openAlarmSoundSettings, sendTestReminder } from '../reminders/schedule';
 import { colors, space } from './theme';
 
 /** Shows whether reminders are set, fixes permission problems, and offers a test. */
@@ -14,7 +15,12 @@ export function ReminderStatus() {
       Alert.alert('Notifications are off', 'Turn on notifications for StashCall in Settings to get reminders.');
       return;
     }
-    Alert.alert('Test reminder on its way', 'It will arrive in about 5 seconds. Try locking your phone.');
+    Alert.alert(
+      'Test reminder on its way',
+      Platform.OS === 'android'
+        ? 'It will arrive in about 5 seconds. Try locking your phone. It rings at your alarm volume, so it sounds even when the phone is on silent.'
+        : 'It will arrive in about 5 seconds. Try locking your phone.',
+    );
   };
 
   if (permission !== 'granted') {
@@ -52,6 +58,15 @@ export function ReminderStatus() {
       <Text style={styles.link} accessibilityRole="button" onPress={test}>
         Send a test reminder
       </Text>
+      {Platform.OS === 'android' ? (
+        <Text
+          style={styles.link}
+          accessibilityRole="button"
+          onPress={() => openAlarmSoundSettings(Constants.expoConfig?.android?.package ?? 'com.stashcall.app')}
+        >
+          Reminder sound settings
+        </Text>
+      ) : null}
     </View>
   );
 }

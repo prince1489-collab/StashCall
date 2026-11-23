@@ -39,6 +39,9 @@ export default function TripScreen() {
         <Link href="/trip/edit" style={styles.edit} accessibilityRole="button">
           Edit
         </Link>
+        <Link href={{ pathname: '/trip/edit', params: { new: '1' } }} style={styles.edit} accessibilityRole="button">
+          New trip
+        </Link>
       </View>
       <Text style={styles.note}>
         Estimates are worked out from your flight or checkout time. Tap Edit to change any assumption.

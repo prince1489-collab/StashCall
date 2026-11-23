@@ -98,13 +98,18 @@ export function formatLocalDate(local: LocalDateTime): string {
 }
 
 /** Picks a date and a time; value and result are wall-clock strings. */
-export function DateTimeRow(props: { label: string; value: LocalDateTime; onChange: (v: LocalDateTime) => void }) {
+export function DateTimeRow(props: {
+  label: string;
+  hint?: string;
+  value: LocalDateTime;
+  onChange: (v: LocalDateTime) => void;
+}) {
   const date = localToPickerDate(props.value);
   const set = (d?: Date) => d && props.onChange(pickerDateToLocal(d));
 
   if (Platform.OS === 'ios') {
     return (
-      <Row label={props.label}>
+      <Row label={props.label} hint={props.hint}>
         <DateTimePicker value={date} mode="datetime" display="compact" minuteInterval={5} onValueChange={(_, d) => set(d)} />
       </Row>
     );
@@ -114,7 +119,7 @@ export function DateTimeRow(props: { label: string; value: LocalDateTime; onChan
     DateTimePickerAndroid.open({ value: date, mode, is24Hour: true, onValueChange: (_, d) => set(d) });
 
   return (
-    <Row label={props.label}>
+    <Row label={props.label} hint={props.hint}>
       <View style={styles.inlineButtons}>
         <PillButton label={formatLocalDate(props.value)} onPress={() => open('date')} />
         <PillButton label={props.value.slice(11)} onPress={() => open('time')} />
