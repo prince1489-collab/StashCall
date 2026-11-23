@@ -12,7 +12,7 @@
     },
     "android": {
       "adaptiveIcon": {
-        "backgroundColor": "#E6F4FE",
+        "backgroundColor": "#1B2A41",
         "foregroundImage": "./assets/android-icon-foreground.png",
         "backgroundImage": "./assets/android-icon-background.png",
         "monochromeImage": "./assets/android-icon-monochrome.png"
@@ -29,6 +29,19 @@
     "scheme": "stashcall",
     "plugins": [
       "expo-router",
+      [
+        "expo-splash-screen",
+        {
+          "image": "./assets/splash-icon.png",
+          "imageWidth": 180,
+          "resizeMode": "contain",
+          "backgroundColor": "#1B2A41"
+        }
+      ],
+      [
+        "expo-font",
+        {}
+      ],
       "@react-native-community/datetimepicker",
       [
         "expo-image-picker",
@@ -43,7 +56,9 @@
         {
           "sounds": [
             "./assets/sounds/stashcall_alarm.wav"
-          ]
+          ],
+          "icon": "./assets/notification-icon.png",
+          "color": "#E9A23B"
         }
       ],
       [
@@ -70,6 +85,7 @@
       "eas": {
         "projectId": "b258cf9e-314b-48b3-903c-ecc131885c0e"
       }
-    }
+    },
+    "primaryColor": "#1B2A41"
   }
 }

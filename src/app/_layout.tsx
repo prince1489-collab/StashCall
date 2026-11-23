@@ -1,4 +1,9 @@
+import { Manrope_700Bold } from '@expo-google-fonts/manrope/700Bold';
+import { Manrope_800ExtraBold } from '@expo-google-fonts/manrope/800ExtraBold';
+import { useFonts } from 'expo-font';
 import { Stack } from 'expo-router';
+import * as SplashScreen from 'expo-splash-screen';
+import { useEffect } from 'react';
 import { ShareIntentProvider } from 'expo-share-intent';
 import { StatusBar } from 'expo-status-bar';
 
@@ -7,11 +12,20 @@ import { RemindersProvider } from '../reminders/Reminders';
 import { configureNotifications } from '../reminders/schedule';
 import { ShareInbox } from '../share/ShareInbox';
 import { AppDataProvider } from '../state/AppData';
-import { colors } from '../ui/theme';
+import { colors, fonts } from '../ui/theme';
 
 configureNotifications();
+// Keep the navy splash up until the fonts are ready, so text never jumps.
+SplashScreen.preventAutoHideAsync().catch(() => {});
 
 export default function RootLayout() {
+  const [loaded, failed] = useFonts({ Manrope_700Bold, Manrope_800ExtraBold });
+  const ready = loaded || !!failed;
+  useEffect(() => {
+    if (ready) SplashScreen.hideAsync().catch(() => {});
+  }, [ready]);
+  if (!ready) return null;
+
   return (
     <ShareIntentProvider>
       <AppDataProvider>
@@ -19,7 +33,15 @@ export default function RootLayout() {
           <NotificationActions />
           <ShareInbox />
           <StatusBar style="dark" />
-          <Stack screenOptions={{ contentStyle: { backgroundColor: colors.bg }, headerTintColor: colors.accent }}>
+          <Stack
+            screenOptions={{
+              contentStyle: { backgroundColor: colors.bg },
+              headerTintColor: colors.accent,
+              headerStyle: { backgroundColor: colors.bg },
+              headerShadowVisible: false,
+              headerTitleStyle: { fontFamily: fonts.bold },
+            }}
+          >
             <Stack.Screen name="(tabs)" options={{ headerShown: false }} />
             <Stack.Screen name="trip/edit" options={{ presentation: 'modal', title: 'Trip' }} />
             <Stack.Screen name="item/edit" options={{ presentation: 'modal', title: 'Item' }} />

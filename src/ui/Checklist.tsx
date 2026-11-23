@@ -2,7 +2,7 @@ import { Pressable, StyleSheet, Text, View } from 'react-native';
 
 import type { Item, Owner } from '../domain/types';
 import { ItemThumb } from './ItemRow';
-import { colors, space } from './theme';
+import { colors, fonts, space } from './theme';
 
 /** Tap-to-tick list of the items for one reminder. */
 export function Checklist(props: {
@@ -57,7 +57,7 @@ const styles = StyleSheet.create({
     marginBottom: space.l,
   },
   label: { color: colors.accent, fontSize: 13, fontWeight: '700', textTransform: 'uppercase' },
-  title: { fontSize: 22, fontWeight: '700', color: colors.text, marginTop: space.xs },
+  title: { fontSize: 22, fontFamily: fonts.display, color: colors.text, marginTop: space.xs },
   progress: { fontSize: 14, color: colors.muted, marginTop: space.xs, marginBottom: space.s },
   row: { flexDirection: 'row', alignItems: 'center', gap: space.m, paddingVertical: space.s },
   box: {
@@ -69,7 +69,7 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'center',
   },
-  boxOn: { backgroundColor: colors.accent, borderColor: colors.accent },
+  boxOn: { backgroundColor: colors.done, borderColor: colors.done },
   tick: { color: '#fff', fontWeight: '700' },
   name: { fontSize: 16, color: colors.text },
   nameDone: { color: colors.muted, textDecorationLine: 'line-through' },
