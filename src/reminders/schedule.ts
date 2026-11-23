@@ -1,5 +1,5 @@
 import * as Notifications from 'expo-notifications';
-import { Platform } from 'react-native';
+import { Linking, Platform } from 'react-native';
 
 import type { PlannedReminder } from './plan';
 
@@ -59,6 +59,21 @@ export function configureNotifications(): void {
     // points at it, and deleting it would push that snooze onto Expo's
     // fallback channel. It holds nothing else now.
     void OLD_CHANNEL;
+  }
+}
+
+/**
+ * Opens Android's settings page for the alarm channel, where the user can
+ * check the sound and volume StashCall's reminders use.
+ */
+export async function openAlarmSoundSettings(packageName: string): Promise<void> {
+  try {
+    await Linking.sendIntent('android.settings.CHANNEL_NOTIFICATION_SETTINGS', [
+      { key: 'android.provider.extra.APP_PACKAGE', value: packageName },
+      { key: 'android.provider.extra.CHANNEL_ID', value: CHANNEL },
+    ]);
+  } catch {
+    await Linking.openSettings();
   }
 }
 

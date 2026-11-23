@@ -57,7 +57,8 @@
           ],
           "disableIOS": true
         }
-      ]
+      ],
+      "./plugins/withTextRecognitionModel"
     ],
     "owner": "prince1489",
     "extra": {
