@@ -29,7 +29,7 @@ export default function Today() {
 
   if (!currentTrip) {
     return (
-      <View style={styles.empty}>
+      <ScrollView contentContainerStyle={styles.empty}>
         <Text style={styles.brand}>StashCall</Text>
         <Text style={styles.emptyTitle}>Never leave the important things behind.</Text>
         <View style={styles.steps}>
@@ -48,7 +48,7 @@ export default function Today() {
           Got a booking email or boarding pass? Screenshot it, then share it to StashCall from your gallery. It fills in
           the trip for you.
         </Text>
-      </View>
+      </ScrollView>
     );
   }
 
@@ -125,7 +125,7 @@ const styles = StyleSheet.create({
   nextDay: { color: '#fff', fontSize: 15, opacity: 0.85 },
   nextItems: { color: '#fff', fontSize: 16, marginTop: space.m, lineHeight: 22 },
   section: { fontSize: 13, fontWeight: '600', color: colors.muted, textTransform: 'uppercase', marginTop: space.xl },
-  empty: { flex: 1, justifyContent: 'center', padding: space.xl, gap: space.l },
+  empty: { flexGrow: 1, justifyContent: 'center', padding: space.xl, gap: space.l },
   brand: { fontSize: 15, fontWeight: '700', color: colors.accent },
   emptyTitle: { fontSize: 26, fontWeight: '700', color: colors.text },
   overBox: { gap: space.l },

@@ -196,6 +196,8 @@ export function ZoneRow(props: {
   onChange: (z: string) => void;
   /** Show "Choose" instead of the zone until the user picks one. */
   unset?: boolean;
+  /** Heading of the zone list. */
+  title?: string;
 }) {
   const [open, setOpen] = useState(false);
   const zones = Array.from(new Set([deviceZone(), ...COMMON_ZONES]));
@@ -204,7 +206,7 @@ export function ZoneRow(props: {
       <PillButton label={props.unset ? 'Choose' : zoneLabel(props.value)} onPress={() => setOpen(true)} />
       <Modal visible={open} animationType="slide" presentationStyle="pageSheet" onRequestClose={() => setOpen(false)}>
         <View style={styles.modalHeader}>
-          <Text style={styles.modalTitle}>Hotel time zone</Text>
+          <Text style={styles.modalTitle}>{props.title ?? 'Hotel time zone'}</Text>
           <Pressable onPress={() => setOpen(false)} accessibilityRole="button">
             <Text style={styles.link}>Done</Text>
           </Pressable>

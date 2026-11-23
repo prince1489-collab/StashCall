@@ -15,7 +15,7 @@ export function openChecklistStep(steps: TimelineStep[], now: Date): TimelineSte
   for (let i = steps.length - 1; i >= 0; i--) {
     const s = steps[i];
     if (!s.itemMoment || s.at.getTime() > t) continue;
-    const next = steps.slice(i + 1).find((x) => x.notify || x.kind === 'checkout' || x.kind === 'takeoff');
+    const next = steps.slice(i + 1).find((x) => x.notify || x.kind === 'checkout' || x.kind === 'takeoff' || x.kind === 'returnTakeoff');
     const closes = Math.min(s.at.getTime() + OPEN_FOR_MS, next ? next.at.getTime() : Infinity);
     return t < closes ? s : undefined;
   }
