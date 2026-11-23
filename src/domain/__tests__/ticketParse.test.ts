@@ -105,3 +105,10 @@ describe('draftFromTicket', () => {
     expect(draftFromTicket(d, 'Europe/London').flight?.international).toBe(false);
   });
 });
+
+describe('dotted dates', () => {
+  it('does not read 19.02.2027 as the time 19:02', () => {
+    const d = parseTicketText(['BA138', 'BOM LHR', '19.02.2027', 'Departs 02:15'], today);
+    expect(d.departure).toBe('2027-02-19T02:15');
+  });
+});
