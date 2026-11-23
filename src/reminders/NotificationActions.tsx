@@ -2,9 +2,11 @@ import * as Notifications from 'expo-notifications';
 import { useEffect, useRef } from 'react';
 
 import { tickAll } from '../domain/checklist';
+import { setPrep } from '../domain/prep';
 import { buildTimeline } from '../domain/timeline';
 import { stepItems } from '../domain/tripItems';
-import type { StepKind } from '../domain/types';
+import type { PrepKind, StepKind } from '../domain/types';
+import { newId } from '../storage/store';
 import { useAppData } from '../state/AppData';
 import { ACTION_DONE, ACTION_SNOOZE, snoozeReminder } from './schedule';
 
@@ -37,15 +39,18 @@ export function NotificationActions() {
       if (handled.current.has(key)) return;
       handled.current.add(key);
 
-      const { kind, tripId } = (request.content.data ?? {}) as { kind?: StepKind; tripId?: string };
+      const { kind, tripId } = (request.content.data ?? {}) as { kind?: StepKind | PrepKind; tripId?: string };
       if (actionIdentifier === ACTION_SNOOZE) {
         await snoozeReminder(request.content, tripId && kind ? `${tripId}:${kind}` : request.identifier);
+      } else if (tripId && (kind === 'insurance' || kind === 'visa')) {
+        await update((d) => setPrep(d, tripId, kind, 'done', newId));
       } else if (tripId && kind) {
         const trip = latest.current.trips.find((t) => t.id === tripId);
         const step = trip && buildTimeline(trip).find((s) => s.kind === kind);
         if (trip && step) {
+          const stepKind = step.kind;
           const ids = stepItems(trip, latest.current.items, step).map((i) => i.id);
-          await update((d) => tickAll(d, tripId, kind, ids));
+          await update((d) => tickAll(d, tripId, stepKind, ids));
         }
       }
       await Notifications.dismissNotificationAsync(request.identifier).catch(() => {});

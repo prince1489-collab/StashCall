@@ -1,6 +1,6 @@
 import AsyncStorage from '@react-native-async-storage/async-storage';
 
-import type { Item, Owner, Trip } from '../domain/types';
+import type { InsuranceCover, Item, Owner, Trip } from '../domain/types';
 
 /**
  * Everything StashCall knows, kept on the device only.
@@ -11,6 +11,8 @@ export interface AppData {
   owners: Owner[];
   items: Item[];
   trips: Trip[];
+  /** How the household is insured for travel; unset until asked. */
+  insurance?: InsuranceCover;
 }
 
 const KEY = 'stashcall:data';

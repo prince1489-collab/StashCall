@@ -1,6 +1,7 @@
 import { buildTimeline } from '../domain/timeline';
 import { stepItemNames } from '../domain/tripItems';
-import type { Item, StepKind, TimelineStep, Trip } from '../domain/types';
+import { prepTasks } from '../domain/prep';
+import type { InsuranceCover, Item, PrepKind, StepKind, TimelineStep, Trip } from '../domain/types';
 
 export interface PlannedReminder {
   /** Stable id: same trip + step → same id, so rescheduling replaces it. */
@@ -8,7 +9,7 @@ export interface PlannedReminder {
   at: Date;
   title: string;
   body: string;
-  kind: StepKind;
+  kind: StepKind | PrepKind;
   /** Time-critical reminders use the strongest delivery Android allows. */
   critical: boolean;
   tripId: string;
@@ -86,12 +87,44 @@ function textFor(step: TimelineStep, steps: TimelineStep[], items: string[]): { 
   }
 }
 
+const PREP_TEXT: Record<PrepKind, { title: string; body: string }> = {
+  insurance: {
+    title: 'Travel insurance',
+    body: 'Have you bought travel insurance for this trip? Tap Done once it is sorted.',
+  },
+  visa: {
+    title: 'Visa and entry rules',
+    body: 'Check if you need a visa, e-visa or travel authorisation for this trip. Some take weeks. Open StashCall to tick it off.',
+  },
+};
+
+/** Reminders for the "Before you go" tasks that are still open. */
+export function planPrepReminders(trip: Trip, cover: InsuranceCover | undefined, now: Date): PlannedReminder[] {
+  return prepTasks(trip, cover)
+    .filter((t) => t.status === 'todo')
+    .flatMap((t) =>
+      t.remindAt
+        .filter((at) => at.getTime() > now.getTime())
+        .map((at, i) => ({
+          id: `${trip.id}:${t.kind}:${i}`,
+          at,
+          ...PREP_TEXT[t.kind],
+          kind: t.kind,
+          critical: false,
+          tripId: trip.id,
+          // Insurance gets a "Done" button. A visa needs an answer in the app:
+          // got one (it joins the packing list) or not needed.
+          hasItems: t.kind === 'insurance',
+        })),
+    );
+}
+
 /** Every future reminder for a trip, in time order. */
 export function planReminders(trip: Trip, items: Item[], now: Date): PlannedReminder[] {
   const steps = buildTimeline(trip);
-  return steps
+  const timeline = steps
     .filter((s) => s.notify && s.at.getTime() > now.getTime())
-    .map((s) => {
+    .map((s): PlannedReminder | null => {
       const names = stepItemNames(trip, items, s);
       const text = textFor(s, steps, names);
       if (!text) return null;
@@ -106,4 +139,5 @@ export function planReminders(trip: Trip, items: Item[], now: Date): PlannedRemi
       };
     })
     .filter((r): r is PlannedReminder => r !== null);
+  return timeline;
 }

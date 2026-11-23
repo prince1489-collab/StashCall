@@ -6,6 +6,7 @@ import { buildTimeline } from '../../domain/timeline';
 import { stepItemNames } from '../../domain/tripItems';
 import { useNow } from '../../hooks/useNow';
 import { useAppData } from '../../state/AppData';
+import { BeforeYouGo } from '../../ui/BeforeYouGo';
 import { PrimaryButton, formatLocalDate } from '../../ui/Form';
 import { ReminderStatus } from '../../ui/ReminderStatus';
 import { Tickets } from '../../ui/Tickets';
@@ -49,6 +50,7 @@ export default function TripScreen() {
       <Text style={styles.share} onPress={share} accessibilityRole="button">
         Share checklist
       </Text>
+      <BeforeYouGo trip={currentTrip} />
       <Tickets trip={currentTrip} />
       <ReminderStatus />
       <Timeline steps={steps} now={now} itemsFor={(s) => stepItemNames(currentTrip, data.items, s)} />
