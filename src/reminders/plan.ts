@@ -1,7 +1,8 @@
 import { buildTimeline } from '../domain/timeline';
 import { stepItemNames } from '../domain/tripItems';
-import { prepTasks } from '../domain/prep';
-import type { InsuranceCover, Item, PrepKind, StepKind, TimelineStep, Trip } from '../domain/types';
+import { prepTasks, shortDate } from '../domain/prep';
+import type { PrepPrefs, PrepTask } from '../domain/prep';
+import type { Item, PrepKind, StepKind, TimelineStep, Trip } from '../domain/types';
 
 export interface PlannedReminder {
   /** Stable id: same trip + step → same id, so rescheduling replaces it. */
@@ -87,20 +88,33 @@ function textFor(step: TimelineStep, steps: TimelineStep[], items: string[]): { 
   }
 }
 
-const PREP_TEXT: Record<PrepKind, { title: string; body: string }> = {
-  insurance: {
-    title: 'Travel insurance',
-    body: 'Have you bought travel insurance for this trip? Tap Done once it is sorted.',
-  },
-  visa: {
-    title: 'Visa and entry rules',
-    body: 'Check if you need a visa, e-visa or travel authorisation for this trip. Some take weeks. Open StashCall to tick it off.',
-  },
-};
+function prepText(t: PrepTask): { title: string; body: string } {
+  switch (t.kind) {
+    case 'insurance':
+      return t.problem === 'insuranceEnds'
+        ? {
+            title: 'Travel insurance runs out',
+            body: `Your policy ends on ${shortDate(t.date!)}, before this trip ends. Renew it or buy cover for this trip.`,
+          }
+        : { title: 'Travel insurance', body: 'Have you bought travel insurance for this trip? Tap Done once it is sorted.' };
+    case 'visa':
+      return t.problem === 'visaExpires'
+        ? { title: 'Visa runs out', body: `Your visa ends on ${shortDate(t.date!)}, before this trip ends. Check your dates.` }
+        : {
+            title: 'Visa and entry rules',
+            body: 'Check if you need a visa, e-visa or travel authorisation for this trip. Some take weeks. Open StashCall to tick it off.',
+          };
+    case 'passport':
+      return {
+        title: 'Check your passport',
+        body: `It runs out on ${shortDate(t.date!)}. Many countries want 6 months left when you arrive, and renewing can take weeks.`,
+      };
+  }
+}
 
 /** Reminders for the "Before you go" tasks that are still open. */
-export function planPrepReminders(trip: Trip, cover: InsuranceCover | undefined, now: Date): PlannedReminder[] {
-  return prepTasks(trip, cover)
+export function planPrepReminders(trip: Trip, prefs: PrepPrefs, now: Date): PlannedReminder[] {
+  return prepTasks(trip, prefs)
     .filter((t) => t.status === 'todo')
     .flatMap((t) =>
       t.remindAt
@@ -108,13 +122,13 @@ export function planPrepReminders(trip: Trip, cover: InsuranceCover | undefined,
         .map((at, i) => ({
           id: `${trip.id}:${t.kind}:${i}`,
           at,
-          ...PREP_TEXT[t.kind],
+          ...prepText(t),
           kind: t.kind,
           critical: false,
           tripId: trip.id,
-          // Insurance gets a "Done" button. A visa needs an answer in the app:
-          // got one (it joins the packing list) or not needed.
-          hasItems: t.kind === 'insurance',
+          // Plain insurance gets a "Done" button. The rest need an answer or
+          // a new date in the app.
+          hasItems: t.kind === 'insurance' && !t.problem,
         })),
     );
 }

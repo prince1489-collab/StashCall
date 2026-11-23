@@ -1,7 +1,7 @@
 import type { AppData } from '../storage/store';
 import { DEFAULTS } from './defaults';
 import { addMinutes, instantToZoned, zonedToInstant } from './time';
-import type { InsuranceCover, Item, LocalDateTime, PrepKind, PrepStatus, Trip } from './types';
+import type { InsuranceCover, Item, LocalDate, Ticket, LocalDateTime, PrepKind, PrepStatus, Trip } from './types';
 
 /**
  * "Before you go": things to sort out in the weeks before a trip, which
@@ -15,6 +15,14 @@ export interface PrepTask {
   title: string;
   /** todo: still to do. covered: insured by an annual or bank policy. */
   status: 'todo' | 'covered' | PrepStatus;
+  /**
+   * Why a task that would be fine needs looking at again:
+   * the annual policy or the visa runs out before the trip ends, or the
+   * passport has less than 6 months left when the trip starts.
+   */
+  problem?: 'insuranceEnds' | 'visaExpires' | 'passportShort';
+  /** The date behind the problem, or the known expiry date. */
+  date?: LocalDate;
   /** When the reminders for an open task go off, in time order. */
   remindAt: Date[];
   timeZone: string;
@@ -26,7 +34,15 @@ const REMIND_DAYS: Record<PrepKind, [number, number]> = {
   insurance: [28, 7],
   // Some visas take weeks; e-visas and ESTA/ETA forms a few days.
   visa: [42, 10],
+  // Passport renewals can take several weeks.
+  passport: [56, 21],
 };
+
+/** What the household told us once, for every trip. */
+export type PrepPrefs = Pick<AppData, 'insurance' | 'insuranceEnds' | 'passportExpires'>;
+
+/** Countries often want 6 months left on a passport after arrival. */
+export const PASSPORT_MONTHS = 6;
 
 export const VISA_ITEM_NAME = 'Visa or e-visa';
 
@@ -74,26 +90,71 @@ function reminderTimes(trip: Trip, kind: PrepKind): { times: Date[]; timeZone: s
   return { times, timeZone: start.timeZone };
 }
 
-export function prepTasks(trip: Trip, cover: InsuranceCover | undefined): PrepTask[] {
+/** The first and last days of the trip, as dates. */
+export function tripDates(trip: Trip): { start: LocalDate; end: LocalDate } | undefined {
+  const times = [trip.flight?.departure, trip.checkout?.checkout, trip.returnFlight?.departure].filter(
+    (x): x is string => !!x,
+  );
+  if (times.length === 0) return undefined;
+  const days = times.map((t) => t.slice(0, 10)).sort();
+  return { start: days[0], end: days[days.length - 1] };
+}
+
+/** "23 Jan 2027", for reminder texts. */
+export function shortDate(date: LocalDate): string {
+  const [y, m, d] = date.split('-').map(Number);
+  return new Date(Date.UTC(y, m - 1, d)).toLocaleDateString('en-GB', { day: 'numeric', month: 'short', year: 'numeric', timeZone: 'UTC' });
+}
+
+export function addMonths(date: LocalDate, months: number): LocalDate {
+  const [y, m, d] = date.split('-').map(Number);
+  return new Date(Date.UTC(y, m - 1 + months, d)).toISOString().slice(0, 10);
+}
+
+export function prepTasks(trip: Trip, prefs: PrepPrefs): PrepTask[] {
   const tasks: PrepTask[] = [];
-  const insured = cover === 'annual' || cover === 'card';
-  const ins = reminderTimes(trip, 'insurance');
-  tasks.push({
-    kind: 'insurance',
-    title: 'Travel insurance',
-    status: insured ? 'covered' : (trip.prep?.insurance ?? 'todo'),
-    remindAt: ins.times,
-    timeZone: ins.timeZone,
-  });
+  const dates = tripDates(trip);
+  const task = (kind: PrepKind, title: string, status: PrepTask['status'], extra: Partial<PrepTask> = {}): PrepTask => {
+    const r = reminderTimes(trip, kind);
+    return { kind, title, status, remindAt: r.times, timeZone: r.timeZone, ...extra };
+  };
+
+  // Insurance: an annual or bank policy covers the trip unless it ends first.
+  const policy = prefs.insurance === 'annual' || prefs.insurance === 'card';
+  const policyEndsFirst = policy && !!prefs.insuranceEnds && !!dates && prefs.insuranceEnds < dates.end;
+  if (policy && !policyEndsFirst) {
+    tasks.push(task('insurance', 'Travel insurance', 'covered', { date: prefs.insuranceEnds }));
+  } else {
+    tasks.push(
+      task('insurance', 'Travel insurance', trip.prep?.insurance ?? 'todo', {
+        ...(policyEndsFirst && { problem: 'insuranceEnds' as const, date: prefs.insuranceEnds }),
+      }),
+    );
+  }
+
   if (isInternational(trip)) {
-    const visa = reminderTimes(trip, 'visa');
-    tasks.push({
-      kind: 'visa',
-      title: 'Visa and entry rules',
-      status: trip.prep?.visa ?? 'todo',
-      remindAt: visa.times,
-      timeZone: visa.timeZone,
-    });
+    // Visa: sorted, unless it runs out before the trip ends.
+    const visaShort = trip.prep?.visa === 'done' && !!trip.visaExpires && !!dates && trip.visaExpires < dates.end;
+    tasks.push(
+      task('visa', 'Visa and entry rules', visaShort ? 'todo' : (trip.prep?.visa ?? 'todo'), {
+        date: trip.visaExpires,
+        ...(visaShort && { problem: 'visaExpires' as const }),
+      }),
+    );
+
+    // Passport: fine with 6 months left at the start; otherwise worth a check.
+    const expires = prefs.passportExpires;
+    const short = !!expires && !!dates && expires < addMonths(dates.start, PASSPORT_MONTHS);
+    const answered = trip.prep?.passport;
+    const status: PrepTask['status'] = answered ?? (expires && !short ? 'covered' : 'todo');
+    tasks.push(
+      task('passport', 'Passport', status, {
+        date: expires,
+        ...(short && { problem: 'passportShort' as const }),
+        // Only nag when we know there's a problem; an unknown date just shows on the card.
+        ...(!short && { remindAt: [] }),
+      }),
+    );
   }
   return tasks;
 }
@@ -124,5 +185,39 @@ export function setPrep(data: AppData, tripId: string, kind: PrepKind, status: P
     ...data,
     items,
     trips: data.trips.map((t) => (t.id === tripId ? { ...t, prep, itemIds } : t)),
+  };
+}
+
+/** Where a task's document photos live: the household policy, or the trip. */
+function docsOwner(data: AppData, kind: 'insurance' | 'visa'): 'household' | 'trip' {
+  return kind === 'insurance' && (data.insurance === 'annual' || data.insurance === 'card') ? 'household' : 'trip';
+}
+
+/** Photos for a task. */
+export function docsFor(data: AppData, trip: Trip, kind: 'insurance' | 'visa'): Ticket[] {
+  // The household policy shows on every trip, next to any bought for this one.
+  const household = kind === 'insurance' ? (data.insuranceDocs ?? []) : [];
+  return [...household, ...(trip.docs?.[kind] ?? [])];
+}
+
+export function addDoc(data: AppData, tripId: string, kind: 'insurance' | 'visa', doc: Ticket): AppData {
+  if (docsOwner(data, kind) === 'household') return { ...data, insuranceDocs: [...(data.insuranceDocs ?? []), doc] };
+  return {
+    ...data,
+    trips: data.trips.map((t) =>
+      t.id === tripId ? { ...t, docs: { ...t.docs, [kind]: [...(t.docs?.[kind] ?? []), doc] } } : t,
+    ),
+  };
+}
+
+/** Removes a photo wherever it is kept. */
+export function removeDoc(data: AppData, docId: string): AppData {
+  const drop = (list?: Ticket[]) => list?.filter((d) => d.id !== docId);
+  return {
+    ...data,
+    insuranceDocs: drop(data.insuranceDocs),
+    trips: data.trips.map((t) =>
+      t.docs ? { ...t, docs: { insurance: drop(t.docs.insurance), visa: drop(t.docs.visa) } } : t,
+    ),
   };
 }

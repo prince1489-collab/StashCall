@@ -6,7 +6,8 @@ import { sendFeedback } from '../feedback/sendFeedback';
 import { useAppData } from '../state/AppData';
 import type { InsuranceCover } from '../domain/types';
 import { COVER_LABELS } from '../ui/BeforeYouGo';
-import { Row, Section } from '../ui/Form';
+import { shortDate } from '../domain/prep';
+import { Row, Section, pickDate } from '../ui/Form';
 import { ReminderStatus } from '../ui/ReminderStatus';
 import { colors, space } from '../ui/theme';
 
@@ -48,8 +49,32 @@ export default function Settings() {
             {COVER_LABELS[c]}
           </Text>
         ))}
+        {data.insurance === 'annual' || data.insurance === 'card' ? (
+          <Text
+            style={styles.option}
+            onPress={() => pickDate(data.insuranceEnds, (date) => update((d) => ({ ...d, insuranceEnds: date })))}
+            accessibilityRole="button"
+          >
+            Policy ends: <Text style={styles.optionOn}>{data.insuranceEnds ? shortDate(data.insuranceEnds) : 'Add date'}</Text>
+          </Text>
+        ) : null}
         <Text style={styles.note}>
-          With an annual or bank policy, insurance is ticked off on every trip. Otherwise StashCall reminds you to buy it.
+          With an annual or bank policy, insurance is ticked off on every trip that ends before the policy does.
+          Otherwise StashCall reminds you to buy it.
+        </Text>
+      </Section>
+
+      <Section title="Passport">
+        <Text
+          style={styles.option}
+          onPress={() => pickDate(data.passportExpires, (date) => update((d) => ({ ...d, passportExpires: date })))}
+          accessibilityRole="button"
+        >
+          Expires: <Text style={styles.optionOn}>{data.passportExpires ? shortDate(data.passportExpires) : 'Add date'}</Text>
+        </Text>
+        <Text style={styles.note}>
+          The passport in your household that runs out first. Many countries want 6 months left when you arrive, so
+          StashCall warns you in time to renew.
         </Text>
       </Section>
 

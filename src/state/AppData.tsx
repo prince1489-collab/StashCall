@@ -57,7 +57,8 @@ export function AppDataProvider({ children }: { children: ReactNode }) {
     (id: string) => {
       // One-off items go with their trip, photos included.
       for (const i of current.current.items) if (i.tripId === id) deletePhoto(i.photoUri);
-      for (const t of current.current.trips.find((x) => x.id === id)?.tickets ?? []) deletePhoto(t.uri);
+      const trip = current.current.trips.find((x) => x.id === id);
+      for (const t of [...(trip?.tickets ?? []), ...(trip?.docs?.insurance ?? []), ...(trip?.docs?.visa ?? [])]) deletePhoto(t.uri);
       return update((d) => removeTrip(d, id));
     },
     [update],
