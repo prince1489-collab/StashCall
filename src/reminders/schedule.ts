@@ -4,7 +4,7 @@ import { Platform } from 'react-native';
 import type { PlannedReminder } from './plan';
 
 // Android fixes a channel's sound and importance when it's first created, so
-// alarm-style reminders need a new channel id; the old quiet one is removed.
+// alarm-style reminders need a new channel id.
 const CHANNEL = 'travel-alarms';
 const OLD_CHANNEL = 'travel-reminders';
 /** Bundled via the expo-notifications plugin in app.json (assets/sounds). */
@@ -55,7 +55,10 @@ export function configureNotifications(): void {
       bypassDnd: true,
       lockscreenVisibility: Notifications.AndroidNotificationVisibility.PUBLIC,
     }).catch(() => {});
-    Notifications.deleteNotificationChannelAsync(OLD_CHANNEL).catch(() => {});
+    // The old quiet channel is kept: a snooze set before this update still
+    // points at it, and deleting it would push that snooze onto Expo's
+    // fallback channel. It holds nothing else now.
+    void OLD_CHANNEL;
   }
 }
 
