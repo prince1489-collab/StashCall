@@ -190,6 +190,9 @@ export default function EditTrip() {
     // Ask at the moment it obviously matters: right after planning a trip.
     await askPermission();
     router.back();
+    // First trip and nothing saved yet: go straight to picking items, or the
+    // reminders have nothing to name.
+    if (savedItems(data.items).length === 0) router.navigate('/items');
   };
 
   const remove = () => {

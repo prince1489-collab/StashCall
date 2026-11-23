@@ -1,13 +1,15 @@
 import { Tabs, router } from 'expo-router';
-import { Text, View } from 'react-native';
+import { Text } from 'react-native';
 import type { ColorValue } from 'react-native';
 
 import { colors } from '../../ui/theme';
 
-// Simple dot icons for the tester build; proper icons come with polish.
-const dot = ({ color, focused }: { color: ColorValue; focused: boolean }) => (
-  <View style={{ width: focused ? 10 : 8, height: focused ? 10 : 8, borderRadius: 5, backgroundColor: color }} />
-);
+// Text-glyph icons for the tester build, tinted like the labels.
+const glyph =
+  (g: string) =>
+  ({ color, focused }: { color: ColorValue; focused: boolean }) => (
+    <Text style={{ color, fontSize: focused ? 22 : 20, lineHeight: 24 }}>{g}</Text>
+  );
 
 export default function TabsLayout() {
   return (
@@ -15,7 +17,6 @@ export default function TabsLayout() {
       screenOptions={{
         tabBarActiveTintColor: colors.accent,
         tabBarInactiveTintColor: colors.muted,
-        tabBarIcon: dot,
         sceneStyle: { backgroundColor: colors.bg },
         headerRight: () => (
           <Text
@@ -28,9 +29,9 @@ export default function TabsLayout() {
         ),
       }}
     >
-      <Tabs.Screen name="index" options={{ title: 'Today' }} />
-      <Tabs.Screen name="trip" options={{ title: 'Trip' }} />
-      <Tabs.Screen name="items" options={{ title: 'Items' }} />
+      <Tabs.Screen name="index" options={{ title: 'Today', tabBarIcon: glyph('◉') }} />
+      <Tabs.Screen name="trip" options={{ title: 'Trip', tabBarIcon: glyph('✈\uFE0E') }} />
+      <Tabs.Screen name="items" options={{ title: 'Items', tabBarIcon: glyph('☰') }} />
     </Tabs>
   );
 }
