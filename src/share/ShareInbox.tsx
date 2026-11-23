@@ -45,20 +45,20 @@ export function ShareInbox() {
       return;
     }
 
-    const kept: Ticket[] = [];
-    for (const f of images) {
-      try {
-        kept.push({ id: newId(), uri: keepTicket(f.path), addedAt: new Date().toISOString() });
-      } catch {
-        // Skip a file we couldn't read; keep the rest.
-      }
-    }
-    if (kept.length === 0) {
-      Alert.alert("Couldn't save that", 'Try again, or add the screenshot from the Trip tab.');
-      return;
-    }
-
     (async () => {
+      const kept: Ticket[] = [];
+      for (const f of images) {
+        try {
+          kept.push({ id: newId(), uri: await keepTicket(f.path), addedAt: new Date().toISOString() });
+        } catch {
+          // Skip a file we couldn't read; keep the rest.
+        }
+      }
+      if (kept.length === 0) {
+        Alert.alert("Couldn't save that", 'Try again, or add the screenshot from the Trip tab.');
+        return;
+      }
+
       let details: TicketDetails = {};
       let problem: string | undefined;
       for (const t of kept) {
