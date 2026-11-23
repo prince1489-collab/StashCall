@@ -10,7 +10,7 @@ import { buildTimeline, defaultFlight } from '../../domain/timeline';
 import type { FlightLeg, HotelCheckout, Ticket, Trip } from '../../domain/types';
 import { deletePhoto, pickTicket } from '../../storage/photos';
 import { newId } from '../../storage/store';
-import { readTicket } from '../../tickets/readTicket';
+import { readProblem, readTicket } from '../../tickets/readTicket';
 import { useReminders } from '../../reminders/Reminders';
 import { useAppData } from '../../state/AppData';
 import {
@@ -38,7 +38,7 @@ function localDaysFromNow(days: number, hour: number): string {
 }
 
 /** Route params: `new=1` starts a blank trip; `tickets` and `details` come from a shared screenshot. */
-type Params = { new?: string; tickets?: string; details?: string };
+type Params = { new?: string; tickets?: string; details?: string; problem?: string };
 
 function fromJson<T>(s?: string): T | undefined {
   try {
@@ -87,9 +87,12 @@ export default function EditTrip() {
     [],
   );
 
-  const applyTicket = (d: TicketDetails) => {
+  /** `problem` says why nothing was read, when the reader itself failed. */
+  const applyTicket = (d: TicketDetails, problem?: string) => {
     if (!hasTripDetails(d)) {
-      setReadNote("Couldn't find a flight or checkout time in that screenshot. It's kept with the trip; fill in the times below.");
+      setReadNote(
+        `${problem ?? "Couldn't find a flight or checkout time in that screenshot."} It's kept with the trip; fill in the times below.`,
+      );
       return;
     }
     const draft = draftFromTicket(d, deviceZone());
@@ -115,7 +118,7 @@ export default function EditTrip() {
     const shared = fromJson<Ticket[]>(params.tickets);
     if (!shared?.length) return;
     setAdded(shared);
-    applyTicket(fromJson<TicketDetails>(params.details) ?? {});
+    applyTicket(fromJson<TicketDetails>(params.details) ?? {}, params.problem);
   }, []); // eslint-disable-line react-hooks/exhaustive-deps
 
   const fillFromScreenshot = async () => {
@@ -124,7 +127,8 @@ export default function EditTrip() {
     setAdded((a) => [...a, { id: newId(), uri, addedAt: new Date().toISOString() }]);
     setReading(true);
     try {
-      applyTicket(await readTicket(uri));
+      const r = await readTicket(uri);
+      applyTicket(r.details, readProblem(r));
     } finally {
       setReading(false);
     }

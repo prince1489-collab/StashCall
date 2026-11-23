@@ -10,7 +10,7 @@ import type { Ticket, Trip } from '../domain/types';
 import { useAppData } from '../state/AppData';
 import { keepTicket } from '../storage/photos';
 import { newId } from '../storage/store';
-import { readTicket } from '../tickets/readTicket';
+import { readProblem, readTicket } from '../tickets/readTicket';
 
 /** True when the screenshot is about the trip we already have. */
 function sameTrip(trip: Trip, d: TicketDetails): boolean {
@@ -60,8 +60,11 @@ export function ShareInbox() {
 
     (async () => {
       let details: TicketDetails = {};
+      let problem: string | undefined;
       for (const t of kept) {
-        details = await readTicket(t.uri);
+        const r = await readTicket(t.uri);
+        details = r.details;
+        problem = readProblem(r);
         if (hasTripDetails(details)) break;
       }
 
@@ -72,7 +75,12 @@ export function ShareInbox() {
         // new trip, filled in from the screenshot, for the user to check and save.
         router.push({
           pathname: '/trip/edit',
-          params: { new: '1', tickets: JSON.stringify(kept), details: JSON.stringify(details) },
+          params: {
+            new: '1',
+            tickets: JSON.stringify(kept),
+            details: JSON.stringify(details),
+            ...(problem && { problem }),
+          },
         });
         return;
       }
