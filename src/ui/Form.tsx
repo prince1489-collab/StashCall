@@ -3,7 +3,7 @@ import { useState } from 'react';
 import type { ReactNode } from 'react';
 import { Modal, Platform, Pressable, ScrollView, StyleSheet, Switch, Text, View } from 'react-native';
 
-import type { LocalDateTime, LocalTime } from '../domain/types';
+import type { LocalDate, LocalDateTime, LocalTime } from '../domain/types';
 import { colors, space } from './theme';
 
 export function Section({ title, children }: { title?: string; children: ReactNode }) {
@@ -126,6 +126,20 @@ export function DateTimeRow(props: {
       </View>
     </Row>
   );
+}
+
+/** Opens the phone's date picker; `onPick` gets "YYYY-MM-DD". Android only for now. */
+export function pickDate(value: LocalDate | undefined, onPick: (d: LocalDate) => void) {
+  if (Platform.OS !== 'android') return;
+  const now = new Date();
+  const start = value
+    ? (([y, m, d]) => new Date(y, m - 1, d))(value.split('-').map(Number))
+    : new Date(now.getFullYear() + 1, now.getMonth(), now.getDate());
+  DateTimePickerAndroid.open({
+    value: start,
+    mode: 'date',
+    onValueChange: (_, d) => d && onPick(`${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}`),
+  });
 }
 
 /** Picks a time of day, e.g. the evening packing reminder. */

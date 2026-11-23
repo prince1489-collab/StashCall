@@ -42,7 +42,7 @@ export function NotificationActions() {
       const { kind, tripId } = (request.content.data ?? {}) as { kind?: StepKind | PrepKind; tripId?: string };
       if (actionIdentifier === ACTION_SNOOZE) {
         await snoozeReminder(request.content, tripId && kind ? `${tripId}:${kind}` : request.identifier);
-      } else if (tripId && (kind === 'insurance' || kind === 'visa')) {
+      } else if (tripId && (kind === 'insurance' || kind === 'visa' || kind === 'passport')) {
         await update((d) => setPrep(d, tripId, kind, 'done', newId));
       } else if (tripId && kind) {
         const trip = latest.current.trips.find((t) => t.id === tripId);

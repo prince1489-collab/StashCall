@@ -44,11 +44,11 @@ export function RemindersProvider({ children }: { children: ReactNode }) {
         setExact(ex);
         const now = new Date();
         const plan = currentTrip
-          ? [...planPrepReminders(currentTrip, data.insurance, now), ...planReminders(currentTrip, data.items, now)]
+          ? [...planPrepReminders(currentTrip, data, now), ...planReminders(currentTrip, data.items, now)]
           : [];
         setScheduled(await syncReminders(plan, data.trips.map((t) => t.id)));
       }),
-    [queue, currentTrip, data.items, data.trips, data.insurance],
+    [queue, currentTrip, data.items, data.trips, data.insurance, data.insuranceEnds, data.passportExpires],
   );
 
   useEffect(() => {

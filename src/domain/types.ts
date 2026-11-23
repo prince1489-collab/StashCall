@@ -89,13 +89,20 @@ export interface Trip {
   tickets?: Ticket[];
   /** Things sorted before travel day, such as insurance and visas. */
   prep?: Partial<Record<PrepKind, PrepStatus>>;
+  /** Photos of this trip's insurance policy or visa. */
+  docs?: Partial<Record<'insurance' | 'visa', Ticket[]>>;
+  /** When the visa for this trip runs out, if the user told us. */
+  visaExpires?: LocalDate;
   /** Item ids ticked off, keyed by timeline step kind. */
   ticked: Partial<Record<StepKind, string[]>>;
   createdAt: string;
 }
 
 /** Things to sort out in the weeks before a trip. */
-export type PrepKind = 'insurance' | 'visa';
+export type PrepKind = 'insurance' | 'visa' | 'passport';
+
+/** A calendar date with no time, e.g. "2027-01-23". */
+export type LocalDate = string;
 
 /** How the household is insured for travel. */
 export type InsuranceCover = 'annual' | 'card' | 'perTrip';

@@ -41,6 +41,16 @@ export async function pickTicket(): Promise<string | null> {
   return keepTicket(result.assets[0].uri);
 }
 
+/** A photo of a document (insurance, visa), full size so the small print stays readable. */
+export async function takeDocPhoto(source: 'camera' | 'library'): Promise<string | null> {
+  if (source === 'library') return pickTicket();
+  const perm = await ImagePicker.requestCameraPermissionsAsync();
+  if (!perm.granted) return null;
+  const result = await ImagePicker.launchCameraAsync({ mediaTypes: ['images'], quality: 0.9 });
+  if (result.canceled || !result.assets[0]) return null;
+  return keepTicket(result.assets[0].uri);
+}
+
 /** Returns a kept photo URI, or null if the user cancelled or said no. */
 export async function takeItemPhoto(source: 'camera' | 'library'): Promise<string | null> {
   const perm =
