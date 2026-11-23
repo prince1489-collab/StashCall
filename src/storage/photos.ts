@@ -17,17 +17,18 @@ function ticketDir(): Directory {
   return dir;
 }
 
-function keep(uri: string, dir: Directory = photoDir()): string {
+async function keep(uri: string, dir: Directory = photoDir()): Promise<string> {
   const src = uri.includes('://') ? uri : `file://${uri}`;
   const last = src.split('/').pop() ?? '';
   const ext = (last.includes('.') ? last.split('.').pop()?.split('?')[0] : '') || 'jpg';
   const dest = new File(dir, `${Date.now().toString(36)}${Math.random().toString(36).slice(2, 6)}.${ext}`);
-  new File(src).copy(dest);
+  // copy() is async in this SDK: wait for it, or the file may not be there yet.
+  await new File(src).copy(dest);
   return dest.uri;
 }
 
 /** Copies a shared or picked ticket image into the app. */
-export function keepTicket(uri: string): string {
+export async function keepTicket(uri: string): Promise<string> {
   return keep(uri, ticketDir());
 }
 
