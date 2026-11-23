@@ -8,7 +8,7 @@ import { newId } from '../../storage/store';
 import { useAppData } from '../../state/AppData';
 import { PrimaryButton, Section, styles as formStyles } from '../../ui/Form';
 import { ItemRow, MOMENT_LABEL } from '../../ui/ItemRow';
-import { colors, space } from '../../ui/theme';
+import { colors, fonts, space } from '../../ui/theme';
 
 export default function Items() {
   const { data, ready, currentTrip, update } = useAppData();
@@ -163,8 +163,8 @@ export default function Items() {
 const styles = StyleSheet.create({
   container: { padding: space.l, paddingBottom: 48 },
   header: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' },
-  title: { fontSize: 24, fontWeight: '700', color: colors.text },
-  subtitle: { fontSize: 18, fontWeight: '700', color: colors.text, flex: 1 },
+  title: { fontSize: 26, fontFamily: fonts.display, color: colors.text },
+  subtitle: { fontSize: 18, fontFamily: fonts.bold, color: colors.text, flex: 1 },
   addLink: { fontSize: 16, color: colors.accent, fontWeight: '600', padding: space.s },
   text: { fontSize: 15, color: colors.muted, marginTop: space.xs, marginBottom: space.l, lineHeight: 21 },
   presetRow: {

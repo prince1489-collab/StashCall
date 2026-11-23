@@ -7,7 +7,7 @@ import type { Ticket, Trip } from '../domain/types';
 import { useAppData } from '../state/AppData';
 import { deletePhoto, pickTicket } from '../storage/photos';
 import { newId } from '../storage/store';
-import { colors, space } from './theme';
+import { colors, fonts, space } from './theme';
 
 /**
  * The trip's ticket screenshots: a row of thumbnails, tap one to see it full
@@ -90,7 +90,7 @@ const styles = StyleSheet.create({
     marginVertical: space.m,
   },
   header: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' },
-  title: { fontSize: 16, fontWeight: '700', color: colors.text },
+  title: { fontSize: 16, fontFamily: fonts.bold, color: colors.text },
   link: { fontSize: 16, color: colors.accent, fontWeight: '600' },
   hint: { fontSize: 14, color: colors.muted, marginTop: space.s, lineHeight: 20 },
   row: { gap: space.m, marginTop: space.m },

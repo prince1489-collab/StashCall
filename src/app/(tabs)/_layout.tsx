@@ -1,15 +1,8 @@
 import { Tabs, router } from 'expo-router';
 import { Text } from 'react-native';
-import type { ColorValue } from 'react-native';
 
-import { colors } from '../../ui/theme';
-
-// Text-glyph icons for the tester build, tinted like the labels.
-const glyph =
-  (g: string) =>
-  ({ color, focused }: { color: ColorValue; focused: boolean }) => (
-    <Text style={{ color, fontSize: focused ? 22 : 20, lineHeight: 24 }}>{g}</Text>
-  );
+import { ClockIcon, PlaneIcon, PocketIcon } from '../../ui/Icons';
+import { colors, fonts } from '../../ui/theme';
 
 export default function TabsLayout() {
   return (
@@ -18,6 +11,11 @@ export default function TabsLayout() {
         tabBarActiveTintColor: colors.accent,
         tabBarInactiveTintColor: colors.muted,
         sceneStyle: { backgroundColor: colors.bg },
+        headerStyle: { backgroundColor: colors.bg },
+        headerShadowVisible: false,
+        headerTitleStyle: { fontFamily: fonts.display, fontSize: 22, color: colors.text },
+        tabBarStyle: { backgroundColor: colors.card, borderTopColor: colors.border },
+        tabBarLabelStyle: { fontSize: 12, fontWeight: '600' },
         headerRight: () => (
           <Text
             onPress={() => router.push('/settings')}
@@ -29,9 +27,9 @@ export default function TabsLayout() {
         ),
       }}
     >
-      <Tabs.Screen name="index" options={{ title: 'Today', tabBarIcon: glyph('◉') }} />
-      <Tabs.Screen name="trip" options={{ title: 'Trip', tabBarIcon: glyph('✈\uFE0E') }} />
-      <Tabs.Screen name="items" options={{ title: 'Items', tabBarIcon: glyph('☰') }} />
+      <Tabs.Screen name="index" options={{ title: 'Today', tabBarIcon: ClockIcon }} />
+      <Tabs.Screen name="trip" options={{ title: 'Trip', tabBarIcon: PlaneIcon }} />
+      <Tabs.Screen name="items" options={{ title: 'Items', tabBarIcon: PocketIcon }} />
     </Tabs>
   );
 }

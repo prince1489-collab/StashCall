@@ -3,7 +3,7 @@ import { StyleSheet, Text, View } from 'react-native';
 import { instantToZoned } from '../domain/time';
 import type { TimelineStep } from '../domain/types';
 import { formatLocalDate, zoneLabel } from './Form';
-import { colors, space } from './theme';
+import { colors, fonts, space } from './theme';
 
 /** A vertical list of timeline steps, grouped by day. */
 export function Timeline({
@@ -61,7 +61,7 @@ const styles = StyleSheet.create({
     borderColor: colors.border,
   },
   past: { opacity: 0.45 },
-  time: { width: 60, fontSize: 17, fontWeight: '600', color: colors.text, fontVariant: ['tabular-nums'] },
+  time: { width: 60, fontSize: 17, fontFamily: fonts.display, color: colors.text, fontVariant: ['tabular-nums'] },
   body: { flex: 1 },
   title: { fontSize: 16, color: colors.text },
   meta: { fontSize: 13, color: colors.muted, marginTop: 2 },
