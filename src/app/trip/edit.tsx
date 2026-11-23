@@ -209,7 +209,7 @@ export default function EditTrip() {
         {reading ? (
           <View style={styles.readingRow}>
             <ActivityIndicator color={colors.accent} />
-            <Text style={styles.fillHint}>Reading your screenshot…</Text>
+            <Text style={styles.fillHint}>Reading your screenshot… The first time can take up to a minute.</Text>
           </View>
         ) : (
           <Text style={styles.fillLink} onPress={fillFromScreenshot} accessibilityRole="button">
