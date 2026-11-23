@@ -72,14 +72,11 @@ export function ShareInbox() {
         if (hasTripDetails(details)) break;
       }
 
-      // Just the flight home for the current trip: add it to that trip.
-      if (
-        currentTrip?.flight &&
-        !currentTrip.returnFlight &&
-        !details.returnFlight &&
-        !details.checkout &&
-        isReturnOf(currentTrip.flight, details)
-      ) {
+      // The flight home for the current trip, on its own or in the whole
+      // round-trip booking: add it to that trip.
+      const homeOnly = !details.returnFlight && !details.checkout && !!currentTrip?.flight && isReturnOf(currentTrip.flight, details);
+      const fullBooking = !!details.returnFlight && !!details.departure && currentTrip?.flight?.departure === details.departure;
+      if (currentTrip?.flight && !currentTrip.returnFlight && (homeOnly || fullBooking)) {
         router.push({
           pathname: '/trip/edit',
           params: { tickets: JSON.stringify(kept), details: JSON.stringify(details), ...(text && { text }) },

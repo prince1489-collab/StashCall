@@ -112,6 +112,14 @@ export default function EditTrip() {
       return;
     }
     const draft = draftFromTicket(d, deviceZone());
+    // The whole round-trip booking, for a trip that already has this outbound
+    // flight: add the flight home and keep the user's outbound settings.
+    if (outbound && draft.returnFlight && d.departure === outbound.departure) {
+      setHasReturn(true);
+      setReturnFlight(draft.returnFlight);
+      setReadNote(`Added your flight home: ${describeTicket(d.returnFlight!, formatLocalDate)}. Check the times before saving.`);
+      return;
+    }
     setName((n) => n.trim() || draft.name);
     if (draft.flight) {
       flightTouched.current = true;
@@ -190,7 +198,7 @@ export default function EditTrip() {
   const returnZoneUnset = hasReturn && hasFlight && flight.international && !returnFlight.timeZoneConfirmed;
 
   const save = async () => {
-    if (!hasFlight && !hasCheckout) {
+    if (!hasFlight && !hasCheckout && !hasReturn) {
       Alert.alert('Add a flight or a hotel checkout', 'StashCall needs at least one time to plan around.');
       return;
     }

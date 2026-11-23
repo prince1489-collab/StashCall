@@ -165,8 +165,18 @@ export function parseTicketText(blocks: string[], today: Date = new Date()): Tic
 
   const details: TicketDetails = {};
   if (flights.length >= 2) {
+    // Connections leave within a day of the flight before; the flight home
+    // is the first one after a longer gap, and only counts if the booking
+    // ends back where it started (LHR → DXB → BOM is one way, not a return).
+    const gap = flights.findIndex((f, i) => i > 0 && hoursBetween(flights[i - 1].departure!, f.departure!) >= 24);
+    const outbound = gap === -1 ? flights : flights.slice(0, gap);
+    const last = flights[flights.length - 1];
+    const endsHome = !last.to || !flights[0].from || last.to.city === flights[0].from.city;
     Object.assign(details, flights[0]);
-    details.returnFlight = flights[flights.length - 1];
+    // Name the trip after the final stop, not the connecting airport.
+    const arrival = outbound[outbound.length - 1].to;
+    if (arrival) details.to = arrival;
+    if (gap !== -1 && endsHome) details.returnFlight = flights[gap];
   } else {
     Object.assign(details, parseFlight(flightText, today));
   }
@@ -174,6 +184,10 @@ export function parseTicketText(blocks: string[], today: Date = new Date()): Tic
   const checkout = findCheckout(text, today);
   if (checkout) details.checkout = checkout;
   return details;
+}
+
+function hoursBetween(a: LocalDateTime, b: LocalDateTime): number {
+  return (Date.parse(`${b}:00Z`) - Date.parse(`${a}:00Z`)) / 36e5;
 }
 
 /** One flight's worth of details. */

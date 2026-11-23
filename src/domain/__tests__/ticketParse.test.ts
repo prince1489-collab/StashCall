@@ -179,3 +179,37 @@ describe('return flight drafts', () => {
     expect(isReturnOf(outbound, out)).toBe(false);
   });
 });
+
+describe('connecting flights', () => {
+  it('reads a one-way connection as one journey, not a flight home', () => {
+    const d = parseTicketText(
+      ['BA107 LHR DXB', 'Departs 5 Feb 2027 09:40', 'EK500 DXB BOM', 'Departs 5 Feb 2027 22:10'],
+      today,
+    );
+    expect(d.from?.code).toBe('LHR');
+    expect(d.to?.code).toBe('BOM');
+    expect(d.departure).toBe('2027-02-05T09:40');
+    expect(d.returnFlight).toBeUndefined();
+    expect(suggestTripName(d)).toBe('Mumbai in February');
+  });
+
+  it('takes the first flight after the stay as the flight home', () => {
+    const d = parseTicketText(
+      [
+        'EK2 LHR DXB', 'Departs 5 Feb 2027 09:40',
+        'EK500 DXB BOM', 'Departs 5 Feb 2027 22:10',
+        'EK501 BOM DXB', 'Departs 19 Feb 2027 04:30',
+        'EK1 DXB LHR', 'Departs 19 Feb 2027 08:00',
+      ],
+      today,
+    );
+    expect(d.to?.code).toBe('BOM');
+    expect(d.returnFlight?.flightNumber).toBe('EK501');
+    expect(d.returnFlight?.departure).toBe('2027-02-19T04:30');
+  });
+
+  it('skips a flight onward to somewhere else', () => {
+    const d = parseTicketText(['BA137 LHR BOM', 'Departs 5 Feb 2027 09:40', 'AI101 BOM DEL', 'Departs 12 Feb 2027 10:00'], today);
+    expect(d.returnFlight).toBeUndefined();
+  });
+});
