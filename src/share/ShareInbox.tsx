@@ -61,10 +61,12 @@ export function ShareInbox() {
 
       let details: TicketDetails = {};
       let problem: string | undefined;
+      let text: string | undefined;
       for (const t of kept) {
         const r = await readTicket(t.uri);
         details = r.details;
         problem = readProblem(r);
+        text = r.text;
         if (hasTripDetails(details)) break;
       }
 
@@ -80,6 +82,7 @@ export function ShareInbox() {
             tickets: JSON.stringify(kept),
             details: JSON.stringify(details),
             ...(problem && { problem }),
+            ...(text && { text }),
           },
         });
         return;

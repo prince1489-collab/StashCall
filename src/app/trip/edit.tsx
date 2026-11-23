@@ -38,7 +38,7 @@ function localDaysFromNow(days: number, hour: number): string {
 }
 
 /** Route params: `new=1` starts a blank trip; `tickets` and `details` come from a shared screenshot. */
-type Params = { new?: string; tickets?: string; details?: string; problem?: string };
+type Params = { new?: string; tickets?: string; details?: string; problem?: string; text?: string };
 
 function fromJson<T>(s?: string): T | undefined {
   try {
@@ -75,6 +75,9 @@ export default function EditTrip() {
   const [added, setAdded] = useState<Ticket[]>([]);
   const [reading, setReading] = useState(false);
   const [readNote, setReadNote] = useState<string | null>(null);
+  // What the text reader saw, so testers can show us when a read goes wrong.
+  const [readText, setReadText] = useState<string | null>(null);
+  const [showText, setShowText] = useState(false);
   const saved = useRef(false);
   // False while the flight is still the blank form's placeholder.
   const flightTouched = useRef(false);
@@ -119,6 +122,7 @@ export default function EditTrip() {
     if (!shared?.length) return;
     setAdded(shared);
     applyTicket(fromJson<TicketDetails>(params.details) ?? {}, params.problem);
+    if (params.text) setReadText(params.text);
   }, []); // eslint-disable-line react-hooks/exhaustive-deps
 
   const fillFromScreenshot = async () => {
@@ -129,6 +133,8 @@ export default function EditTrip() {
     try {
       const r = await readTicket(uri);
       applyTicket(r.details, readProblem(r));
+      setReadText(r.text ?? null);
+      setShowText(false);
     } finally {
       setReading(false);
     }
@@ -220,6 +226,18 @@ export default function EditTrip() {
           {readNote ??
             'Pick a booking email, boarding pass or hotel booking. StashCall reads it on your phone and keeps it with the trip.'}
         </Text>
+        {readText ? (
+          <>
+            <Text style={styles.textLink} onPress={() => setShowText((v) => !v)} accessibilityRole="button">
+              {showText ? 'Hide what StashCall read' : 'Show what StashCall read'}
+            </Text>
+            {showText ? (
+              <Text style={styles.rawText} selectable>
+                {readText}
+              </Text>
+            ) : null}
+          </>
+        ) : null}
       </View>
 
       <Section title="Trip name">
@@ -344,6 +362,8 @@ const styles = StyleSheet.create({
   },
   fillLink: { fontSize: 16, color: colors.accent, fontWeight: '600' },
   fillHint: { fontSize: 14, color: colors.muted, lineHeight: 20 },
+  textLink: { fontSize: 14, color: colors.accent, fontWeight: '600', marginTop: space.xs },
+  rawText: { fontSize: 12, color: colors.muted, fontFamily: 'monospace', marginTop: space.xs },
   readingRow: { flexDirection: 'row', alignItems: 'center', gap: space.s },
   warn: { color: colors.warn, marginBottom: space.s },
   delete: { color: colors.danger, textAlign: 'center', fontSize: 16, marginTop: space.xl, padding: space.s },

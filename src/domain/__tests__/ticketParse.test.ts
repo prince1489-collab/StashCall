@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 
-import { describeTicket, findDates, findTimes, hasTripDetails, parseTicketText, suggestTripName } from '../ticketParse';
+import { describeTicket, findDates, findTimes, fixOcrDigits, hasTripDetails, parseTicketText, suggestTripName } from '../ticketParse';
 
 const today = new Date(2026, 10, 23); // 23 Nov 2026
 
@@ -110,5 +110,16 @@ describe('dotted dates', () => {
   it('does not read 19.02.2027 as the time 19:02', () => {
     const d = parseTicketText(['BA138', 'BOM LHR', '19.02.2027', 'Departs 02:15'], today);
     expect(d.departure).toBe('2027-02-19T02:15');
+  });
+});
+
+describe('OCR slips', () => {
+  it('reads O2:15 as 02:15 instead of falling back to the arrival time', () => {
+    const blocks = ['BA138 Mumbai to London', 'Departs:', 'Friday, 19 February 2027', 'Chhatrapati Shivaji Maharaj Intl', 'O2:15', 'BOM - Terminal 2', 'Arrives:', 'Friday, 19 February 2027', 'Heathrow', '07:05', 'LHR - Terminal 5'];
+    expect(parseTicketText(blocks, today).departure).toBe('2027-02-19T02:15');
+  });
+
+  it('leaves words alone', () => {
+    expect(fixOcrDigits('Hello OK:ok 1O:3O')).toBe('Hello OK:ok 10:30');
   });
 });
