@@ -91,6 +91,17 @@ function lineAt(text: string, index: number): string {
   return text.slice(start, end === -1 ? undefined : end);
 }
 
+/**
+ * OCR often reads the 0 in "02:15" as the letter O, or 1 as I or l. Fix
+ * those inside anything shaped like a time, so the time isn't missed.
+ */
+export function fixOcrDigits(text: string): string {
+  const digit = (c: string) => (/[Oo]/.test(c) ? '0' : /[Il|]/.test(c) ? '1' : c);
+  return text.replace(/(?<![\w:])([0-9OoIl|]{1,2})([:.])([0-9OoIl|]{2})(?![\w:])/g, (m, h: string, sep: string, mm: string) =>
+    /\d/.test(h + mm) ? `${[...h].map(digit).join('')}${sep}${[...mm].map(digit).join('')}` : m,
+  );
+}
+
 /** A day with no year is the next one on or after `today`. */
 function withYear(day: Day, today: Date): Day {
   if (day.y) return day;
@@ -140,7 +151,7 @@ function findCheckout(text: string, today: Date): LocalDateTime | undefined {
  * Text comes from on-device OCR, so lines may be out of order or split.
  */
 export function parseTicketText(blocks: string[], today: Date = new Date()): TicketDetails {
-  const text = blocks.join('\n');
+  const text = fixOcrDigits(blocks.join('\n'));
   const details: TicketDetails = {};
 
   const airports = findAirports(text);

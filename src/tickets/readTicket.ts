@@ -18,6 +18,8 @@ export interface TicketReading {
   error?: string;
   /** How many blocks of text were found, for "nothing readable" vs "no times". */
   blocks: number;
+  /** The raw text found, for "Show what StashCall read". */
+  text?: string;
 }
 
 /**
@@ -33,7 +35,7 @@ export async function readTicket(uri: string): Promise<TicketReading> {
   for (let attempt = 0; ; attempt++) {
     try {
       const blocks = await ocr.extractTextFromImage(path);
-      return { details: parseTicketText(blocks), blocks: blocks.length };
+      return { details: parseTicketText(blocks), blocks: blocks.length, text: blocks.join('\n\n') };
     } catch (e) {
       const message = e instanceof Error ? e.message : String(e);
       if (/download|unavailable/i.test(message) && attempt < 12) {
