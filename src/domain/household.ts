@@ -9,8 +9,8 @@ import type { Item, Owner } from './types';
 
 type IdFn = () => string;
 
-/** Adds the chosen presets that aren't already saved, and puts them on the current trip. */
-export function addPresets(data: AppData, presetIds: string[], newId: IdFn, now = new Date()): AppData {
+/** Adds the chosen presets that aren't already saved, and puts them on the trip being looked at (else the first). */
+export function addPresets(data: AppData, presetIds: string[], newId: IdFn, now = new Date(), tripId?: string): AppData {
   const have = new Set(data.items.map((i) => i.presetId).filter(Boolean));
   const added: Item[] = PRESET_ITEMS.filter((p) => presetIds.includes(p.id) && !have.has(p.id)).map((p) => ({
     id: newId(),
@@ -19,14 +19,14 @@ export function addPresets(data: AppData, presetIds: string[], newId: IdFn, now 
     presetId: p.id,
     createdAt: now.toISOString(),
   }));
-  return addToCurrentTrip({ ...data, items: [...data.items, ...added] }, added.map((i) => i.id));
+  return addToTrip({ ...data, items: [...data.items, ...added] }, added.map((i) => i.id), tripId);
 }
 
-/** Creates or updates an item. New items go on the current trip. */
-export function upsertItem(data: AppData, item: Item): AppData {
+/** Creates or updates an item. New items go on the trip being looked at (else the first). */
+export function upsertItem(data: AppData, item: Item, tripId?: string): AppData {
   const exists = data.items.some((i) => i.id === item.id);
   if (exists) return { ...data, items: data.items.map((i) => (i.id === item.id ? item : i)) };
-  return addToCurrentTrip({ ...data, items: [...data.items, item] }, [item.id]);
+  return addToTrip({ ...data, items: [...data.items, item] }, [item.id], tripId);
 }
 
 /** Deletes an item everywhere, including from every trip and its ticks. */
@@ -66,17 +66,22 @@ export function ensureOwner(data: AppData, name: string, newId: IdFn): { data: A
   return { data: { ...data, owners: [...data.owners, owner] }, ownerId: owner.id };
 }
 
-/** Puts an item on, or takes it off, the current trip. */
-export function setOnCurrentTrip(data: AppData, itemId: string, on: boolean): AppData {
-  const [trip, ...rest] = data.trips;
-  if (!trip) return data;
-  const ids = trip.itemIds.filter((x) => x !== itemId);
-  return { ...data, trips: [{ ...trip, itemIds: on ? [...ids, itemId] : ids }, ...rest] };
+/** The trip with this id, else the first one: where item changes land. */
+function target(data: AppData, tripId?: string) {
+  return (tripId && data.trips.find((t) => t.id === tripId)) || data.trips[0];
 }
 
-function addToCurrentTrip(data: AppData, itemIds: string[]): AppData {
-  const [trip, ...rest] = data.trips;
+/** Puts an item on, or takes it off, a trip (the one being looked at, else the first). */
+export function setOnCurrentTrip(data: AppData, itemId: string, on: boolean, tripId?: string): AppData {
+  const trip = target(data, tripId);
+  if (!trip) return data;
+  const ids = trip.itemIds.filter((x) => x !== itemId);
+  return { ...data, trips: data.trips.map((t) => (t.id === trip.id ? { ...t, itemIds: on ? [...ids, itemId] : ids } : t)) };
+}
+
+function addToTrip(data: AppData, itemIds: string[], tripId?: string): AppData {
+  const trip = target(data, tripId);
   if (!trip || itemIds.length === 0) return data;
   const ids = Array.from(new Set([...trip.itemIds, ...itemIds]));
-  return { ...data, trips: [{ ...trip, itemIds: ids }, ...rest] };
+  return { ...data, trips: data.trips.map((t) => (t.id === trip.id ? { ...t, itemIds: ids } : t)) };
 }

@@ -56,9 +56,9 @@ export default function EditItem() {
         tripId: justThisTrip ? (existing?.tripId ?? currentTrip?.id) : undefined,
         createdAt: existing?.createdAt ?? new Date().toISOString(),
       };
-      const saved = upsertItem(withOwner, item);
+      const saved = upsertItem(withOwner, item, item.tripId ?? currentTrip?.id);
       // A one-off item is only useful on its trip.
-      return item.tripId ? setOnCurrentTrip(saved, item.id, true) : saved;
+      return item.tripId ? setOnCurrentTrip(saved, item.id, true, item.tripId) : saved;
     });
     router.back();
   };

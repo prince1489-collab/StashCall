@@ -113,3 +113,15 @@ describe('one-off items', () => {
     expect(after.items.map((i) => i.id)).toEqual(['a']);
   });
 });
+
+describe('item changes follow the trip being looked at', () => {
+  it('switches and adds items on that trip, not the first one', () => {
+    const london = trip({ id: 'london' });
+    const delhi = trip({ id: 'delhi' });
+    let d = setOnCurrentTrip(empty([london, delhi]), 'x', true, 'delhi');
+    d = upsertItem(d, { id: 'y', name: 'Shawl', moment: 'both', createdAt: '' }, 'delhi');
+    d = addPresets(d, ['glasses'], () => 'g', new Date(), 'delhi');
+    expect(d.trips.find((t) => t.id === 'delhi')!.itemIds).toEqual(['x', 'y', 'g']);
+    expect(d.trips.find((t) => t.id === 'london')!.itemIds).toEqual([]);
+  });
+});
