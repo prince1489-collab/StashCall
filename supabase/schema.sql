@@ -67,12 +67,17 @@ create policy "members share records" on public.records for all
 -- Start a household and become its first member. Returns its id and invite code.
 create or replace function public.create_household() returns table (id uuid, invite_code text)
   language plpgsql security definer set search_path = public as $$
-declare h households;
+declare
+  h households;
+  code text := '';
 begin
   if auth.uid() is null then raise exception 'not signed in'; end if;
-  insert into households (invite_code)
-    values (upper(substr(translate(encode(gen_random_bytes(9), 'base64'), '+/0O1Il', ''), 1, 8)))
-    returning * into h;
+  -- Built here rather than with pgcrypto, which Supabase keeps outside the
+  -- public schema. No 0/O or 1/I, so the code is easy to read out.
+  for i in 1..8 loop
+    code := code || substr('ABCDEFGHJKLMNPQRSTUVWXYZ23456789', 1 + floor(random() * 32)::int, 1);
+  end loop;
+  insert into households (invite_code) values (code) returning * into h;
   insert into members (household_id) values (h.id);
   return query select h.id, h.invite_code;
 end $$;

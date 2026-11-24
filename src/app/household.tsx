@@ -39,7 +39,8 @@ export default function Household() {
     try {
       await fn();
     } catch (e) {
-      Alert.alert("That didn't work", e instanceof Error ? e.message : 'Check your connection and try again.');
+      const message = (e as { message?: unknown } | null)?.message;
+      Alert.alert("That didn't work", typeof message === 'string' && message ? message : 'Check your connection and try again.');
     } finally {
       setBusy(false);
     }
