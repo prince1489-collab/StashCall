@@ -3,7 +3,7 @@ import { describe, expect, it } from 'vitest';
 import { EMPTY_DATA } from '../../storage/store';
 import type { AppData } from '../../storage/store';
 import type { Trip } from '../../domain/types';
-import { applyRemote, changesToPush, markPushed } from '../records';
+import { applyRemote, changesToPush, fingerprint, markPushed } from '../records';
 import type { SyncRow } from '../records';
 import { toDownload, toRemove, toUpload } from '../ticketPlan';
 
@@ -108,5 +108,17 @@ describe('ticket screenshots', () => {
     expect(toUpload(trips, ['a'])).toEqual([]);
     expect(toDownload(trips)).toEqual([{ tripId: 't1', id: 'b' }]);
     expect(toRemove(trips, ['a', 'gone'])).toEqual(['gone']);
+  });
+
+  it("takes Dad's edit after upgrading, then sends my ticket list", () => {
+    // What an older build agreed with the server: the trip without tickets.
+    const { tickets: _t, ...legacy } = trip;
+    const state = { 'trip:t1': fingerprint(legacy) };
+    const renamed = { ...legacy, name: 'Pantnagar trip' };
+    const r = applyRemote(mine, state, asRows([{ kind: 'trip', id: 't1', data: renamed, deleted: false }]));
+    expect(r.data.trips[0].name).toBe('Pantnagar trip');
+    expect(r.data.trips[0].tickets?.[0].uri).toBe('file:///mine.jpg');
+    const out = changesToPush(r.data, r.state).find((x) => x.id === 't1');
+    expect(out?.data).toMatchObject({ name: 'Pantnagar trip', tickets: [{ id: 'k' }] });
   });
 });

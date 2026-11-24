@@ -7,6 +7,7 @@ import { useAppData } from '../state/AppData';
 import { ensureSignedIn, SHARING_SET_UP, supabase } from './client';
 import { applyRemote, changesToPush, markPushed } from './records';
 import type { SyncRow, SyncState } from './records';
+import { toDownload } from './ticketPlan';
 import { syncTickets } from './tickets';
 
 /** What this phone remembers about sharing. Never shared itself. */
@@ -41,6 +42,9 @@ const Ctx = createContext<SyncContext | null>(null);
 
 /** Wait after a change before sending, so a burst of ticks goes in one request. */
 const PUSH_DELAY_MS = 1500;
+/** A ticket the other phone hasn't finished uploading: look again this often, this many times. */
+const TICKET_RETRY_MS = 20_000;
+const TICKET_RETRIES = 15;
 
 export function SyncProvider({ children }: { children: ReactNode }) {
   const { data, ready, update } = useAppData();
@@ -55,6 +59,8 @@ export function SyncProvider({ children }: { children: ReactNode }) {
   const again = useRef(false);
   // Bumped on leave: a run that started before must not apply or send anything after it.
   const epoch = useRef(0);
+  // Pending look for tickets still on their way.
+  const ticketRetry = useRef<{ timer?: ReturnType<typeof setTimeout>; left: number }>({ left: TICKET_RETRIES });
 
   const save = useCallback(async (next: Stored) => {
     storedRef.current = next;
@@ -134,6 +140,16 @@ export function SyncProvider({ children }: { children: ReactNode }) {
       } catch {
         // Tried again on the next sync.
       }
+      // Storage uploads don't trigger a sync on the other phones, so a ticket
+      // still on its way is looked for again shortly, a limited number of times.
+      const retry = ticketRetry.current;
+      if (retry.timer) clearTimeout(retry.timer);
+      retry.timer = undefined;
+      if (toDownload(dataRef.current.trips).length === 0) retry.left = TICKET_RETRIES;
+      else if (retry.left > 0 && stillHere()) {
+        retry.left -= 1;
+        retry.timer = setTimeout(() => void syncNowRef.current?.(), TICKET_RETRY_MS);
+      }
       if (!stillHere()) return;
       setStatus('synced');
     } catch {
@@ -142,6 +158,7 @@ export function SyncProvider({ children }: { children: ReactNode }) {
     }
   }, [save, update]);
 
+  const syncNowRef = useRef<(() => Promise<void>) | null>(null);
   const syncNow = useCallback(async () => {
     if (running.current) {
       again.current = true;
@@ -157,6 +174,7 @@ export function SyncProvider({ children }: { children: ReactNode }) {
     });
     return running.current;
   }, [runOnce]);
+  syncNowRef.current = syncNow;
 
   // Send local changes shortly after they happen.
   useEffect(() => {

@@ -109,7 +109,8 @@ export function applyRemote(data: AppData, state: SyncState, rows: SyncRow[]): {
     const mine = local.get(key);
     const known = key in state;
     // Changed here since we last agreed with the server, and not sent yet.
-    const changedHere = mine && known && state[key] !== fingerprint(mine.data);
+    const changedHere =
+      mine && known && state[key] !== fingerprint(mine.data) && !onlyNewTicketList(state[key], row.kind, mine.data);
     // Deleted here, and the deletion not sent yet.
     const deletedHere = !mine && known && state[key] !== DELETED;
     // Anything this phone made before it joined loses to the household's copy.
@@ -119,6 +120,23 @@ export function applyRemote(data: AppData, state: SyncState, rows: SyncRow[]): {
     changed = true;
   }
   return { data: changed ? next : data, state: nextState, changed };
+}
+
+/**
+ * Builds before ticket sharing agreed on trips without a ticket list. Adding
+ * the list isn't an edit made on this phone, so it mustn't win over a change
+ * from the others; the list is sent after their change is applied.
+ */
+function onlyNewTicketList(agreed: string | undefined, kind: RecordKind, mine: unknown): boolean {
+  if (kind !== 'trip' || !agreed || agreed === DELETED) return false;
+  try {
+    const before = JSON.parse(agreed) as Record<string, unknown> | null;
+    if (!before || 'tickets' in before) return false;
+  } catch {
+    return false;
+  }
+  const { tickets: _t, ...rest } = mine as Record<string, unknown>;
+  return fingerprint(rest) === agreed;
 }
 
 function remove(data: AppData, kind: RecordKind, id: string): AppData {
