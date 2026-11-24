@@ -108,3 +108,20 @@ grant execute on function public.join_household(text) to authenticated;
 do $$ begin
   alter publication supabase_realtime add table public.records;
 exception when duplicate_object then null; end $$;
+
+-- Ticket screenshots, shared between the household's phones. Private: each
+-- file sits in a folder named after its household, and only that
+-- household's members can read, add or remove it. Other photos stay on
+-- each phone.
+insert into storage.buckets (id, name, public)
+  values ('tickets', 'tickets', false)
+  on conflict (id) do nothing;
+
+drop policy if exists "members share tickets" on storage.objects;
+create policy "members share tickets" on storage.objects for all to authenticated
+  using (bucket_id = 'tickets' and exists (
+    select 1 from public.members m
+    where m.user_id = auth.uid() and m.household_id::text = (storage.foldername(name))[1]))
+  with check (bucket_id = 'tickets' and exists (
+    select 1 from public.members m
+    where m.user_id = auth.uid() and m.household_id::text = (storage.foldername(name))[1]));

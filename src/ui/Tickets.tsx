@@ -58,9 +58,16 @@ export function Tickets({ trip, compact = false }: { trip: Trip; compact?: boole
       ) : (
         <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.row}>
           {tickets.map((t) => (
-            <Pressable key={t.id} onPress={() => setOpen(t)} accessibilityRole="imagebutton" accessibilityLabel="Ticket">
-              <Image source={{ uri: t.uri }} style={styles.thumb} />
-            </Pressable>
+            t.uri ? (
+              <Pressable key={t.id} onPress={() => setOpen(t)} accessibilityRole="imagebutton" accessibilityLabel="Ticket">
+                <Image source={{ uri: t.uri }} style={styles.thumb} />
+              </Pressable>
+            ) : (
+              // Added on another family phone; the screenshot is still on its way.
+              <View key={t.id} style={[styles.thumb, styles.waiting]} accessibilityLabel="Ticket on its way">
+                <Text style={styles.waitingText}>On its way</Text>
+              </View>
+            )
           ))}
         </ScrollView>
       )}
@@ -83,6 +90,8 @@ export function Tickets({ trip, compact = false }: { trip: Trip; compact?: boole
 }
 
 const styles = StyleSheet.create({
+  waiting: { alignItems: 'center', justifyContent: 'center', backgroundColor: colors.accentSoft },
+  waitingText: { fontSize: 12, color: colors.muted, textAlign: 'center' },
   box: {
     backgroundColor: colors.card,
     borderRadius: 12,

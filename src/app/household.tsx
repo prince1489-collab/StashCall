@@ -19,8 +19,8 @@ const STATUS: Record<SyncStatus, string> = {
 
 /**
  * Family sharing: start a household, invite others with a code, or join
- * one. Everyone sees the same trips, items, people and ticks. Photos stay
- * on each phone.
+ * one. Everyone sees the same trips, items, people and ticks. Ticket
+ * screenshots are shared; other photos stay on each phone.
  */
 export default function Household() {
   const { data, update } = useAppData();
@@ -85,7 +85,7 @@ export default function Household() {
     <ScrollView contentContainerStyle={styles.container} keyboardShouldPersistTaps="handled">
       <Text style={styles.lead}>
         Share your trips with the people you travel with. Everyone sees the same flights, items and ticks, and each phone
-        reminds its owner about their own things. Photos stay on each phone.
+        reminds its owner about their own things. Ticket screenshots are shared too; other photos stay on each phone.
       </Text>
 
       {sharing ? (

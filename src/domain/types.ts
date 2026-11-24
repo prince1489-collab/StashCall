@@ -83,7 +83,7 @@ export interface HotelCheckout {
 
 export interface Ticket {
   id: string;
-  /** Local file URI of the image. */
+  /** Local file URI of the image. Empty while a ticket added on another family phone is still on its way. */
   uri: string;
   addedAt: string;
 }
