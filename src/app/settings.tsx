@@ -104,7 +104,7 @@ export default function Settings() {
           label="Stored on this phone"
           hint={`${data.trips.length} trip${data.trips.length === 1 ? '' : 's'}, ${data.items.length} item${
             data.items.length === 1 ? '' : 's'
-          }. Nothing is sent to a server unless you turn on family sharing. Photos never are.`}
+          }. Nothing is sent to a server unless you turn on family sharing, which shares ticket screenshots but no other photos.`}
         />
         <Text style={[styles.action, { color: colors.danger }]} onPress={deleteAll} accessibilityRole="button">
           Delete all my data

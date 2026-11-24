@@ -4,7 +4,8 @@ import type { Item, Person, Trip } from '../domain/types';
 /**
  * Family sharing, as pure functions: AppData becomes one record per trip,
  * item and person, plus the household's settings. Photos and anything else
- * that only makes sense on this phone stay out of the records.
+ * that only makes sense on this phone stay out of the records; tickets are
+ * listed by id and their screenshots shared through storage.
  *
  * Conflicts: the phone pulls first. A remote change replaces the local copy
  * unless this phone has an unsent change to the same thing, in which case
@@ -33,10 +34,14 @@ interface Prefs {
   passportExpires?: AppData['passportExpires'];
 }
 
-/** Fields that hold paths to photos on this phone. */
-function shareableTrip(t: Trip): Omit<Trip, 'tickets' | 'docs'> {
-  const { tickets: _t, docs: _d, ...rest } = t;
-  return rest;
+/**
+ * A trip as the household sees it. Tickets go by id only: the screenshots
+ * themselves travel separately (sync/tickets.ts), and each phone keeps its
+ * own copy. Insurance and visa photos stay on this phone.
+ */
+function shareableTrip(t: Trip): Omit<Trip, 'tickets' | 'docs'> & { tickets: { id: string; addedAt: string }[] } {
+  const { tickets, docs: _d, ...rest } = t;
+  return { ...rest, tickets: (tickets ?? []).map(({ id, addedAt }) => ({ id, addedAt })) };
 }
 function shareableItem(i: Item): Omit<Item, 'photoUri'> {
   const { photoUri: _p, ...rest } = i;
@@ -132,10 +137,16 @@ function remove(data: AppData, kind: RecordKind, id: string): AppData {
 function put(data: AppData, kind: RecordKind, id: string, value: unknown): AppData {
   switch (kind) {
     case 'trip': {
-      const remote = value as Trip;
+      const remote = value as Omit<Trip, 'tickets'> & { tickets?: { id: string; addedAt: string }[] };
       const old = data.trips.find((t) => t.id === id);
-      // Keep this phone's photos of tickets and documents.
-      const trip: Trip = { ...remote, tickets: old?.tickets, docs: old?.docs };
+      // The household's list of tickets, with this phone's copy of each. One
+      // this phone hasn't fetched yet has no file (uri '') until it arrives.
+      // A phone on an older build sends no list at all: keep what's here.
+      const tickets = remote.tickets
+        ? remote.tickets.map((r) => old?.tickets?.find((x) => x.id === r.id) ?? { id: r.id, addedAt: r.addedAt, uri: '' })
+        : (old?.tickets ?? []);
+      // Document photos never leave this phone.
+      const trip: Trip = { ...remote, tickets: tickets.length > 0 ? tickets : undefined, docs: old?.docs };
       if (old) return { ...data, trips: data.trips.map((t) => (t.id === id ? trip : t)) };
       // A new trip goes first if it was made after the current one, like a trip made here.
       const first = data.trips[0];

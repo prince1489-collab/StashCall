@@ -7,6 +7,7 @@ import { useAppData } from '../state/AppData';
 import { ensureSignedIn, SHARING_SET_UP, supabase } from './client';
 import { applyRemote, changesToPush, markPushed } from './records';
 import type { SyncRow, SyncState } from './records';
+import { syncTickets } from './tickets';
 
 /** What this phone remembers about sharing. Never shared itself. */
 interface Stored {
@@ -15,6 +16,8 @@ interface Stored {
   state: SyncState;
   /** Server time of the newest record pulled so far. */
   lastPull?: string;
+  /** Ticket screenshots the household's storage has. */
+  tickets?: string[];
 }
 
 const KEY = 'stashcall:sync';
@@ -114,6 +117,24 @@ export function SyncProvider({ children }: { children: ReactNode }) {
       }
       if (!stillHere()) return;
       await save({ ...storedRef.current, state, lastPull });
+
+      // Ticket screenshots. Slower, and a failure here shouldn't mark the
+      // trips themselves as out of date.
+      try {
+        const tickets = await syncTickets(sb, s.householdId, dataRef.current, storedRef.current.tickets ?? [], async (tripId, ticketId, uri) => {
+          if (!stillHere()) return;
+          await update((d) => ({
+            ...d,
+            trips: d.trips.map((t) =>
+              t.id === tripId ? { ...t, tickets: t.tickets?.map((x) => (x.id === ticketId ? { ...x, uri } : x)) } : t,
+            ),
+          }));
+        });
+        if (stillHere()) await save({ ...storedRef.current, tickets });
+      } catch {
+        // Tried again on the next sync.
+      }
+      if (!stillHere()) return;
       setStatus('synced');
     } catch {
       // No signal, or the server is unreachable: try again on the next change or when the app opens.
