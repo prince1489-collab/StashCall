@@ -119,6 +119,19 @@ export default function Household() {
             </Text>
           )}
 
+          {data.meId ? (
+            <Section title="Who's linked">
+              {data.owners.map((p) => (
+                <View key={p.id} style={styles.linkedRow}>
+                  <Text style={styles.personText}>{p.name}</Text>
+                  <Text style={styles.linkedState}>
+                    {p.id === data.meId ? 'This phone' : p.ownPhone ? 'Linked ✓' : p.child ? 'Covered by this phone' : 'Not joined yet'}
+                  </Text>
+                </View>
+              ))}
+            </Section>
+          ) : null}
+
           <Text style={styles.link} onPress={() => void sync.syncNow()} accessibilityRole="button">
             Sync now
           </Text>
@@ -154,6 +167,8 @@ export default function Household() {
 }
 
 const styles = StyleSheet.create({
+  linkedRow: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', paddingVertical: space.s },
+  linkedState: { fontSize: 14, color: colors.muted },
   container: { padding: space.l, paddingBottom: 48, gap: space.m },
   lead: { fontSize: 15, color: colors.muted, lineHeight: 21 },
   codeCard: { backgroundColor: colors.accent, borderRadius: 20, padding: space.xl, gap: space.xs, alignItems: 'center' },

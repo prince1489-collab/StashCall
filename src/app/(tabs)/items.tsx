@@ -25,7 +25,7 @@ export default function Items() {
     setPicked((p) => (p.includes(id) ? p.filter((x) => x !== id) : [...p, id]));
 
   const addPicked = async () => {
-    await update((d) => addPresets(d, picked, newId));
+    await update((d) => addPresets(d, picked, newId, new Date(), currentTrip?.id));
     setPicked([]);
     setShowPresets(false);
   };
@@ -112,7 +112,7 @@ export default function Items() {
                   currentTrip ? (
                     <Switch
                       value={onTrip.has(item.id)}
-                      onValueChange={(on) => update((d) => setOnCurrentTrip(d, item.id, on))}
+                      onValueChange={(on) => update((d) => setOnCurrentTrip(d, item.id, on, currentTrip?.id))}
                       trackColor={{ true: colors.accent }}
                       accessibilityLabel={`${item.name} on this trip`}
                     />

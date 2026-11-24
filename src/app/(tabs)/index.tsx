@@ -1,11 +1,12 @@
 import { router } from 'expo-router';
-import { ScrollView, StyleSheet, Text, View } from 'react-native';
+import { useState } from 'react';
+import { Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
 
 import { openChecklistStep, toggleTick } from '../../domain/checklist';
 import { savedItems } from '../../domain/household';
 import { instantToZoned } from '../../domain/time';
 import { buildTimeline } from '../../domain/timeline';
-import { stepItemNames, stepItems } from '../../domain/tripItems';
+import { itemCountLabel, stepItemNames, stepItems } from '../../domain/tripItems';
 import { useNow } from '../../hooks/useNow';
 import { sendFeedback } from '../../feedback/sendFeedback';
 import { useAppData } from '../../state/AppData';
@@ -15,11 +16,10 @@ import { Logo } from '../../ui/Icons';
 import { PrimaryButton, formatLocalDate } from '../../ui/Form';
 import { ReminderStatus } from '../../ui/ReminderStatus';
 import { Tickets } from '../../ui/Tickets';
-import { Timeline } from '../../ui/Timeline';
 import { colors, fonts, space } from '../../ui/theme';
 
-/** Item chips on the Next card before "+N more". */
-const CHIPS = 3;
+/** How close the next step must be before Today shows it in full, with tickets. */
+const SOON_MS = 24 * 60 * 60 * 1000;
 
 const HOW_IT_WORKS = [
   { title: 'Add your trip', text: 'Type your flight time, or share a screenshot of your booking.' },
@@ -40,8 +40,10 @@ function countdown(at: Date, now: Date): string {
 
 export default function Today() {
   // Shown as this phone's person travels it, with their own flights.
-  const { data, myTrip: currentTrip, ready, update } = useAppData();
+  // Today follows the next trip coming up, whichever trip the Trip tab is showing.
+  const { data, myComingTrip: currentTrip, ready, update } = useAppData();
   const now = useNow();
+  const [showItems, setShowItems] = useState(false);
   if (!ready) return null;
 
   if (!currentTrip) {
@@ -79,6 +81,8 @@ export default function Today() {
   const trip = currentTrip;
   const next = upcoming[0];
   const nextNames = next ? stepItemNames(currentTrip, data.items, next, data.owners) : [];
+  // Within a day of the next step (or mid-checklist), Today shows it in full.
+  const soon = !!open || (!!next && next.at.getTime() - now.getTime() <= SOON_MS);
 
   return (
     <ScrollView contentContainerStyle={styles.container}>
@@ -101,7 +105,7 @@ export default function Today() {
           onToggle={(itemId) => update((d) => toggleTick(d, trip.id, open.kind, itemId))}
         />
       ) : null}
-      {next ? (
+      {next && soon ? (
         <View style={styles.nextCard}>
           <View style={styles.nextTop}>
             <Text style={styles.nextLabel}>Next · {formatLocalDate(instantToZoned(next.at, next.timeZone))}</Text>
@@ -110,17 +114,25 @@ export default function Today() {
           <Text style={styles.nextTime}>{next.localTime}</Text>
           <Text style={styles.nextTitle}>{next.title}</Text>
           {nextNames.length > 0 ? (
-            <View style={styles.chips}>
-              {nextNames.slice(0, CHIPS).map((name) => (
-                <Text key={name} style={styles.chip}>
-                  {name}
-                </Text>
-              ))}
-              {nextNames.length > CHIPS ? (
-                <Text style={[styles.chip, styles.chipMore]}>+{nextNames.length - CHIPS} more</Text>
-              ) : null}
-            </View>
+            <Pressable onPress={() => setShowItems((v) => !v)} accessibilityRole="button" accessibilityState={{ expanded: showItems }}>
+              <Text style={styles.count}>
+                {itemCountLabel(next, nextNames.length)} {showItems ? '⌃' : '›'}
+              </Text>
+              {showItems ? <Text style={styles.names}>{nextNames.join('  ·  ')}</Text> : null}
+            </Pressable>
           ) : null}
+        </View>
+      ) : next ? (
+        <View style={styles.quiet}>
+          <Text style={styles.quietTitle}>Nothing to do today</Text>
+          <Text style={styles.quietText}>
+            Next: {next.title.toLowerCase()} on {formatLocalDate(instantToZoned(next.at, next.timeZone))} at {next.localTime},{' '}
+            {countdown(next.at, now)}.
+            {nextNames.length > 0 ? ` ${itemCountLabel(next, nextNames.length)}.` : ''}
+          </Text>
+          <Text style={styles.nudgeLink} onPress={() => router.navigate('/trip')} accessibilityRole="button">
+            See the whole plan
+          </Text>
         </View>
       ) : (
         <View style={styles.overBox}>
@@ -132,14 +144,8 @@ export default function Today() {
         </View>
       )}
       {next ? <BeforeYouGo trip={currentTrip} compact /> : null}
-      <Tickets trip={currentTrip} compact />
-      <ReminderStatus />
-      {upcoming.length > 1 ? (
-        <>
-          <Text style={styles.section}>Coming up</Text>
-          <Timeline steps={upcoming.slice(1, 5)} itemsFor={(s) => stepItemNames(currentTrip, data.items, s, data.owners)} now={now} />
-        </>
-      ) : null}
+      {soon ? <Tickets trip={currentTrip} compact /> : null}
+      <ReminderStatus problemsOnly />
       <Text style={styles.footerLink} onPress={sendFeedback} accessibilityRole="button">
         Send feedback
       </Text>
@@ -166,18 +172,18 @@ const styles = StyleSheet.create({
   },
   nextTime: { color: '#fff', fontSize: 60, fontFamily: fonts.display, letterSpacing: -2, marginTop: space.s, fontVariant: ['tabular-nums'] },
   nextTitle: { color: '#fff', fontSize: 20, fontFamily: fonts.bold },
-  chips: { flexDirection: 'row', flexWrap: 'wrap', gap: space.s, marginTop: space.m },
-  chip: {
-    backgroundColor: colors.accentSoft,
-    color: colors.text,
-    fontSize: 13,
-    borderRadius: 999,
-    paddingHorizontal: 12,
-    paddingVertical: 6,
-    overflow: 'hidden',
+  count: { color: '#fff', fontSize: 15, fontWeight: '600', marginTop: space.m },
+  names: { color: colors.onAccentMuted, fontSize: 14, lineHeight: 21, marginTop: space.xs },
+  quiet: {
+    backgroundColor: colors.card,
+    borderRadius: 20,
+    borderWidth: StyleSheet.hairlineWidth,
+    borderColor: colors.border,
+    padding: space.xl,
+    gap: space.s,
   },
-  chipMore: { backgroundColor: 'rgba(255,255,255,0.14)', color: '#fff' },
-  section: { fontSize: 13, fontWeight: '600', color: colors.muted, textTransform: 'uppercase', marginTop: space.xl },
+  quietTitle: { fontSize: 22, fontFamily: fonts.display, color: colors.text },
+  quietText: { fontSize: 15, color: colors.muted, lineHeight: 22 },
   empty: { flexGrow: 1, justifyContent: 'center', padding: space.xl, gap: space.l },
   brandRow: { flexDirection: 'row', alignItems: 'center', gap: space.m },
   brand: { fontSize: 22, fontFamily: fonts.display, color: colors.accent },

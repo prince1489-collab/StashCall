@@ -2,6 +2,8 @@ import { createContext, useCallback, useContext, useEffect, useMemo, useRef, use
 import type { ReactNode } from 'react';
 import { AppState } from 'react-native';
 
+import { tripFor } from '../domain/people';
+import { upcomingTrips } from '../domain/trips';
 import { useAppData } from '../state/AppData';
 import { planPrepReminders, planReminders } from './plan';
 import { latestOnly } from './serial';
@@ -21,13 +23,13 @@ interface RemindersContext {
 const Ctx = createContext<RemindersContext | null>(null);
 
 /**
- * Keeps the phone's scheduled notifications in step with the current trip.
+ * Keeps the phone's scheduled notifications in step with every trip still to come.
  * Re-syncs whenever trips or items change and whenever the app comes back
  * to the foreground (to pick up permission changes made in Settings).
  */
 export function RemindersProvider({ children }: { children: ReactNode }) {
   // Reminders follow this phone's person's own flights.
-  const { data, ready, myTrip: currentTrip } = useAppData();
+  const { data, ready } = useAppData();
   const [permission, setPermission] = useState<PermissionState>('undetermined');
   const [exact, setExact] = useState(true);
   const [scheduled, setScheduled] = useState(0);
@@ -44,12 +46,15 @@ export function RemindersProvider({ children }: { children: ReactNode }) {
         setPermission(perm);
         setExact(ex);
         const now = new Date();
-        const plan = currentTrip
-          ? [...planPrepReminders(currentTrip, data, now), ...planReminders(currentTrip, data.items, now, data.owners, data.meId)]
-          : [];
+        // Every trip still to come, as this phone's person travels it.
+        // Each trip as this person flies it first, so a later flight of their own still counts as to come.
+        const plan = upcomingTrips(
+          data.trips.map((t) => tripFor(t, data.meId)),
+          now,
+        ).flatMap((t) => [...planPrepReminders(t, data, now), ...planReminders(t, data.items, now, data.owners, data.meId)]);
         setScheduled(await syncReminders(plan, data.trips.map((t) => t.id)));
       }),
-    [queue, currentTrip, data.items, data.trips, data.insurance, data.insuranceEnds, data.passportExpires, data.owners, data.meId],
+    [queue, data.items, data.trips, data.insurance, data.insuranceEnds, data.passportExpires, data.owners, data.meId],
   );
 
   useEffect(() => {
