@@ -55,6 +55,15 @@ describe("each person's own flights", () => {
     expect(tripFor(t, 'dad').flight?.airport).toBe('UDR');
   });
 
+  it('keeps "not flying home" instead of falling back to the trip\'s flight', () => {
+    const home = defaultFlight('2026-12-08T13:00', 'Asia/Kolkata', false);
+    let d = { ...EMPTY_DATA, trips: [{ ...trip(), returnFlight: home }] };
+    d = setPersonFlights(d, 't1', 'dad', { flight: d.trips[0].flight, returnFlight: undefined });
+    expect(d.trips[0].personFlights).toEqual({ dad: { returnFlight: null } });
+    expect(tripFor(d.trips[0], 'dad').returnFlight).toBeUndefined();
+    expect(tripFor(d.trips[0], 'me').returnFlight).toEqual(home);
+  });
+
   it('drops flights that are the same as the trip, so trip edits reach them', () => {
     let d = { ...EMPTY_DATA, trips: [trip()] };
     d = setPersonFlights(d, 't1', 'dad', { flight: d.trips[0].flight });

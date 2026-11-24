@@ -98,7 +98,7 @@ function WhoFlies({ trip }: { trip: Trip }) {
       <Text style={styles.whoHeading}>Who flies when</Text>
       {going.map((p) => {
         const f = tripFor(trip, p.id).flight;
-        const own = !!trip.personFlights?.[p.id]?.flight;
+        const own = trip.personFlights?.[p.id]?.flight !== undefined;
         return (
           <Pressable
             key={p.id}

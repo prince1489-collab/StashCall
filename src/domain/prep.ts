@@ -161,7 +161,11 @@ export function prepTasks(trip: Trip, prefs: PrepPrefs): PrepTask[] {
     const first = firstPassport(trip, prefs);
     const expires = first?.date;
     const short = !!expires && !!dates && expires < addMonths(dates.start, PASSPORT_MONTHS);
-    const answered = trip.prep?.passport;
+    // An answer covers the passport it was given for. If someone else's now
+    // runs out first (a new traveller, a new date), ask again.
+    const answered = trip.passportCheckedFor === undefined || trip.passportCheckedFor === passportKey(first)
+      ? trip.prep?.passport
+      : undefined;
     const status: PrepTask['status'] = answered ?? (expires && !short ? 'covered' : 'todo');
     tasks.push(
       task('passport', 'Passport', status, {
@@ -175,6 +179,11 @@ export function prepTasks(trip: Trip, prefs: PrepPrefs): PrepTask[] {
     );
   }
   return tasks;
+}
+
+/** Which passport an answer was about: whose, and its date. */
+function passportKey(first: { date: LocalDate; personId?: string } | undefined): string {
+  return first ? `${first.personId ?? 'household'}:${first.date}` : 'none';
 }
 
 /**
@@ -202,7 +211,11 @@ export function setPrep(data: AppData, tripId: string, kind: PrepKind, status: P
   return {
     ...data,
     items,
-    trips: data.trips.map((t) => (t.id === tripId ? { ...t, prep, itemIds } : t)),
+    trips: data.trips.map((t) => {
+      if (t.id !== tripId) return t;
+      if (kind !== 'passport') return { ...t, prep, itemIds };
+      return { ...t, prep, itemIds, passportCheckedFor: status ? passportKey(firstPassport(t, data)) : undefined };
+    }),
   };
 }
 

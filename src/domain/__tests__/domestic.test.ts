@@ -31,6 +31,15 @@ describe('domestic trips', () => {
     expect(stepItemNames(trip(true), items, abroad)).toEqual(['Passports', 'Plug adaptor', 'Glasses']);
   });
 
+  it("leaves a renamed preset alone: it's the user's own item now", () => {
+    const mine = [{ ...items[0], name: 'Aadhaar card' }, { ...items[1], name: 'USB-C adaptor' }, items[2]];
+    expect(stepItemNames(trip(false), mine, buildTimeline(trip(false)).find((s) => s.kind === 'pack')!)).toEqual([
+      'Aadhaar card',
+      'USB-C adaptor',
+      'Glasses',
+    ]);
+  });
+
   it('makes insurance optional and never reminds about it', () => {
     const t = trip(false);
     const insurance = prepTasks(t, { insurance: 'perTrip' }).find((x) => x.kind === 'insurance')!;

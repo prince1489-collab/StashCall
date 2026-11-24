@@ -4,7 +4,7 @@ import { planReminders } from '../../reminders/plan';
 import { EMPTY_DATA } from '../../storage/store';
 import type { AppData } from '../../storage/store';
 import { addPerson, firstPassport, removePerson, setTravellers } from '../people';
-import { prepTasks } from '../prep';
+import { prepTasks, setPrep } from '../prep';
 import { buildTimeline, defaultFlight } from '../timeline';
 import { stepItemNames } from '../tripItems';
 import type { Item, Person, Trip } from '../types';
@@ -57,6 +57,15 @@ describe('people', () => {
     expect(passport).toMatchObject({ problem: 'passportShort', whose: 'Dad', whoseId: 'dad' });
   });
 
+  it("asks again when a different passport becomes the first to run out", () => {
+    const abroad: Trip = { ...trip(['me'], true), flight: defaultFlight('2027-02-05T09:40', 'Asia/Kolkata', true) };
+    let d: AppData = { ...EMPTY_DATA, owners: [{ ...me, passportExpires: '2027-04-01' }, dad], trips: [abroad], insurance: 'annual' };
+    d = setPrep(d, 't1', 'passport', 'done', () => 'x');
+    expect(prepTasks(d.trips[0], d).find((x) => x.kind === 'passport')?.status).toBe('done');
+    d = setTravellers(d, 't1', ['me', 'dad']);
+    expect(prepTasks(d.trips[0], d).find((x) => x.kind === 'passport')).toMatchObject({ status: 'todo', whose: 'Dad' });
+  });
+
   it('makes the first person added "me" and tidies up on removal', () => {
     let d: AppData = { ...EMPTY_DATA, items, trips: [trip()] };
     d = addPerson(d, me);
@@ -67,7 +76,8 @@ describe('people', () => {
     d = setTravellers(d, 't1', ['dad', 'me']);
     expect(d.trips[0].travellerIds).toBeUndefined();
     d = removePerson(setTravellers(d, 't1', ['dad']), 'dad');
-    expect(d.trips[0].travellerIds).toBeUndefined();
+    // Dad's trip doesn't become everyone's.
+    expect(d.trips[0].travellerIds).toEqual([]);
     expect(d.items.find((i) => i.id === 'b')?.ownerId).toBeUndefined();
   });
 });

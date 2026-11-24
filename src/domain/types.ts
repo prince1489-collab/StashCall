@@ -112,6 +112,8 @@ export interface Trip {
   prep?: Partial<Record<PrepKind, PrepStatus>>;
   /** Photos of this trip's insurance policy or visa. */
   docs?: Partial<Record<'insurance' | 'visa', Ticket[]>>;
+  /** The passport ("person:date") the passport answer was given for. */
+  passportCheckedFor?: string;
   /** When the visa for this trip runs out, if the user told us. */
   visaExpires?: LocalDate;
   /** Item ids ticked off, keyed by timeline step kind. */
@@ -119,10 +121,13 @@ export interface Trip {
   createdAt: string;
 }
 
-/** One person's own flights on a shared trip. Either may be unset: same as the trip's. */
+/**
+ * One person's own flights on a shared trip. Unset: same as the trip's.
+ * null: they don't take that flight.
+ */
 export interface PersonFlights {
-  flight?: FlightLeg;
-  returnFlight?: FlightLeg;
+  flight?: FlightLeg | null;
+  returnFlight?: FlightLeg | null;
 }
 
 /** Things to sort out in the weeks before a trip. */

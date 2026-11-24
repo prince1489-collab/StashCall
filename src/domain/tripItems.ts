@@ -1,6 +1,7 @@
 import { itemsForMoment } from './items';
 import { itemGoes, remindsHere } from './people';
 import { isDomestic } from './prep';
+import { PRESET_ITEMS } from './presets';
 import type { Item, Person, TimelineStep, Trip } from './types';
 
 /** Preset items that only matter when crossing a border. */
@@ -14,9 +15,11 @@ const ABROAD_ONLY = new Set(['adaptor']);
 export function tripItems(trip: Trip, items: Item[], people: Person[] = []): Item[] {
   const onTrip = items.filter((i) => trip.itemIds.includes(i.id) && itemGoes(i, trip, people));
   if (!isDomestic(trip)) return onTrip;
+  // Only items still as the preset made them: a renamed one is the user's own choice.
+  const untouched = (i: Item) => !!i.presetId && PRESET_ITEMS.some((p) => p.id === i.presetId && p.name === i.name);
   return onTrip
-    .filter((i) => !(i.presetId && ABROAD_ONLY.has(i.presetId)))
-    .map((i) => (i.presetId === 'passport' ? { ...i, name: 'Photo ID' } : i));
+    .filter((i) => !(untouched(i) && ABROAD_ONLY.has(i.presetId!)))
+    .map((i) => (untouched(i) && i.presetId === 'passport' ? { ...i, name: 'Photo ID' } : i));
 }
 
 /** The trip's items that a reminder step covers. */
