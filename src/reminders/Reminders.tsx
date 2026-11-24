@@ -47,9 +47,11 @@ export function RemindersProvider({ children }: { children: ReactNode }) {
         setExact(ex);
         const now = new Date();
         // Every trip still to come, as this phone's person travels it.
-        const plan = upcomingTrips(data.trips, now)
-          .map((t) => tripFor(t, data.meId))
-          .flatMap((t) => [...planPrepReminders(t, data, now), ...planReminders(t, data.items, now, data.owners, data.meId)]);
+        // Each trip as this person flies it first, so a later flight of their own still counts as to come.
+        const plan = upcomingTrips(
+          data.trips.map((t) => tripFor(t, data.meId)),
+          now,
+        ).flatMap((t) => [...planPrepReminders(t, data, now), ...planReminders(t, data.items, now, data.owners, data.meId)]);
         setScheduled(await syncReminders(plan, data.trips.map((t) => t.id)));
       }),
     [queue, data.items, data.trips, data.insurance, data.insuranceEnds, data.passportExpires, data.owners, data.meId],

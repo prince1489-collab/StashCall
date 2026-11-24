@@ -1,5 +1,6 @@
 import { createContext, useCallback, useContext, useEffect, useMemo, useRef, useState } from 'react';
 import type { ReactNode } from 'react';
+import { AppState } from 'react-native';
 
 import type { Trip } from '../domain/types';
 import { removeTrip } from '../domain/household';
@@ -36,6 +37,18 @@ export function AppDataProvider({ children }: { children: ReactNode }) {
   // Which trip is open on the Trip tab. Kept only while the app runs, so it
   // opens on the next trip each time.
   const [viewId, setViewId] = useState<string | undefined>();
+  // Which trip is next changes with time: re-check every few minutes and whenever the app opens.
+  const [clock, setClock] = useState(() => Date.now());
+  useEffect(() => {
+    const timer = setInterval(() => setClock(Date.now()), 5 * 60 * 1000);
+    const sub = AppState.addEventListener('change', (st) => {
+      if (st === 'active') setClock(Date.now());
+    });
+    return () => {
+      clearInterval(timer);
+      sub.remove();
+    };
+  }, []);
   // Source of truth for writes, so consecutive updates never lose each other.
   const current = useRef<AppData>(EMPTY_DATA);
 
@@ -87,7 +100,9 @@ export function AppDataProvider({ children }: { children: ReactNode }) {
   }, []);
 
   const value = useMemo<AppDataContext>(() => {
-    const coming = nextTrip(data.trips, new Date());
+    // Judged as this phone's person travels, so their own later flight keeps a trip coming.
+    const mine = nextTrip(data.trips.map((t) => tripFor(t, data.meId)), new Date(clock));
+    const coming = mine && data.trips.find((t) => t.id === mine.id);
     const current = data.trips.find((t) => t.id === viewId) ?? coming;
     return {
       data,
@@ -102,7 +117,7 @@ export function AppDataProvider({ children }: { children: ReactNode }) {
       update,
       resetAll,
     };
-  }, [data, ready, viewId, saveTrip, deleteTrip, update, resetAll]);
+  }, [data, ready, viewId, clock, saveTrip, deleteTrip, update, resetAll]);
 
   return <Ctx.Provider value={value}>{children}</Ctx.Provider>;
 }
