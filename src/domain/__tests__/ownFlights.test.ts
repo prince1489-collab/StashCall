@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest';
 
 import { EMPTY_DATA } from '../../storage/store';
+import type { AppData } from '../../storage/store';
 import { setPersonFlights, tripFor } from '../people';
 import { draftFromTicket, joinsTrip } from '../ticketDraft';
 import { parseTicketText } from '../ticketParse';
@@ -57,7 +58,7 @@ describe("each person's own flights", () => {
 
   it('keeps "not flying home" instead of falling back to the trip\'s flight', () => {
     const home = defaultFlight('2026-12-08T13:00', 'Asia/Kolkata', false);
-    let d = { ...EMPTY_DATA, trips: [{ ...trip(), returnFlight: home }] };
+    let d: AppData = { ...EMPTY_DATA, trips: [{ ...trip(), returnFlight: home }] };
     d = setPersonFlights(d, 't1', 'dad', { flight: d.trips[0].flight, returnFlight: undefined });
     expect(d.trips[0].personFlights).toEqual({ dad: { returnFlight: null } });
     expect(tripFor(d.trips[0], 'dad').returnFlight).toBeUndefined();
