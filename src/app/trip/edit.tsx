@@ -4,6 +4,8 @@ import { ActivityIndicator, Alert, Pressable, ScrollView, StyleSheet, Text, Text
 
 import { DEFAULTS } from '../../domain/defaults';
 import { savedItems } from '../../domain/household';
+import { setPersonFlights, travellers, tripFor } from '../../domain/people';
+import { addTickets } from '../../domain/tickets';
 import { draftFromTicket, flightLeg, isReturnOf } from '../../domain/ticketDraft';
 import { describeTicket, hasTripDetails, type TicketDetails } from '../../domain/ticketParse';
 import { buildTimeline, defaultFlight } from '../../domain/timeline';
@@ -38,7 +40,15 @@ function localDaysFromNow(days: number, hour: number): string {
 }
 
 /** Route params: `new=1` starts a blank trip; `tickets` and `details` come from a shared screenshot. */
-type Params = { new?: string; tickets?: string; details?: string; problem?: string; text?: string };
+type Params = {
+  new?: string;
+  tickets?: string;
+  details?: string;
+  problem?: string;
+  text?: string;
+  /** Edit one person's own flights on the current trip; "ask" lets the user pick whose. */
+  person?: string;
+};
 
 function fromJson<T>(s?: string): T | undefined {
   try {
@@ -57,10 +67,16 @@ function newCheckout(): HotelCheckout {
 }
 
 export default function EditTrip() {
-  const { data, currentTrip, saveTrip, deleteTrip } = useAppData();
+  const { data, currentTrip, saveTrip, deleteTrip, update } = useAppData();
   const { askPermission } = useReminders();
   const params = useLocalSearchParams<Params>();
-  const existing = params.new === '1' ? undefined : currentTrip;
+  // Person mode: the same form, editing only one person's flights on the trip.
+  const personMode = !!params.person && !!currentTrip && params.new !== '1';
+  const [personId, setPersonId] = useState(
+    params.person === 'ask' ? (data.meId ?? data.owners[0]?.id ?? '') : (params.person ?? ''),
+  );
+  const person = data.owners.find((p) => p.id === personId);
+  const existing = params.new === '1' ? undefined : personMode ? tripFor(currentTrip!, personId) : currentTrip;
 
   const [name, setName] = useState(existing?.name ?? '');
   const [hasFlight, setHasFlight] = useState(existing ? !!existing.flight : true);
@@ -85,6 +101,8 @@ export default function EditTrip() {
   const [readText, setReadText] = useState<string | null>(null);
   const [showText, setShowText] = useState(false);
   const saved = useRef(false);
+  // Which legs came from a screenshot, so picking a different person keeps them.
+  const fromTicket = useRef({ flight: false, returnFlight: false });
   // False while the flight is still the blank form's placeholder.
   const flightTouched = useRef(false);
   const addedRef = useRef(added);
@@ -108,6 +126,7 @@ export default function EditTrip() {
     // outbound flight: fill in the flight home and leave the rest alone.
     const outbound = hasFlight && (existing?.flight || flightTouched.current) ? flight : undefined;
     if (outbound && !d.returnFlight && !d.checkout && isReturnOf(outbound, d)) {
+      fromTicket.current.returnFlight = true;
       setHasReturn(true);
       setReturnFlight(flightLeg(d, hasCheckout ? checkout.timeZone : deviceZone(), hasCheckout && !!checkout.timeZoneConfirmed));
       setReadNote(`Added your flight home: ${describeTicket(d, formatLocalDate)}. Check the times before saving.`);
@@ -117,6 +136,7 @@ export default function EditTrip() {
     // The whole round-trip booking, for a trip that already has this outbound
     // flight: add the flight home and keep the user's outbound settings.
     if (outbound && draft.returnFlight && d.departure === outbound.departure) {
+      fromTicket.current.returnFlight = true;
       setHasReturn(true);
       setReturnFlight(draft.returnFlight);
       setReadNote(`Added your flight home: ${describeTicket(d.returnFlight!, formatLocalDate)}. Check the times before saving.`);
@@ -124,6 +144,7 @@ export default function EditTrip() {
     }
     setName((n) => n.trim() || draft.name);
     if (draft.flight) {
+      fromTicket.current.flight = true;
       flightTouched.current = true;
       setHasFlight(true);
       setFlight(draft.flight);
@@ -137,11 +158,29 @@ export default function EditTrip() {
       setCheckout(draft.checkout);
     }
     if (draft.returnFlight) {
+      fromTicket.current.returnFlight = true;
       setHasReturn(true);
       setReturnFlight(draft.returnFlight);
     }
     setReadNote(`Filled in from your screenshot: ${describeTicket(d, formatLocalDate)}. Check the times before saving.`);
   };
+
+  // Picking someone else shows their flights, except a leg read from the
+  // screenshot, which is what the user is assigning to them.
+  const firstPerson = useRef(personId);
+  useEffect(() => {
+    if (!personMode || personId === firstPerson.current) return;
+    firstPerson.current = personId;
+    const theirs = tripFor(currentTrip!, personId);
+    if (!fromTicket.current.flight) {
+      setHasFlight(!!theirs.flight);
+      if (theirs.flight) setFlight(theirs.flight);
+    }
+    if (!fromTicket.current.returnFlight) {
+      setHasReturn(!!theirs.returnFlight);
+      if (theirs.returnFlight) setReturnFlight(theirs.returnFlight);
+    }
+  }, [personId]); // eslint-disable-line react-hooks/exhaustive-deps
 
   // A screenshot shared to StashCall arrives already read.
   useEffect(() => {
@@ -199,7 +238,34 @@ export default function EditTrip() {
   // Same for the flight home: it leaves from wherever you are staying.
   const returnZoneUnset = hasReturn && hasFlight && flight.international && !returnFlight.timeZoneConfirmed;
 
+  const savePerson = async () => {
+    if (!currentTrip || !person) {
+      Alert.alert('Whose flights are these?', 'Pick a person first.');
+      return;
+    }
+    if (returnZoneUnset) {
+      Alert.alert('Where do you fly home from?', 'Pick the time zone of the flight home, so those reminders arrive on time.');
+      return;
+    }
+    const tripId = currentTrip.id;
+    saved.current = true;
+    await update((d) => {
+      let next = setPersonFlights(d, tripId, person.id, {
+        flight: hasFlight ? flight : undefined,
+        returnFlight: hasReturn ? returnFlight : undefined,
+      });
+      // Their own flights mean they're going.
+      const t = next.trips.find((x) => x.id === tripId);
+      if (t?.travellerIds && !t.travellerIds.includes(person.id))
+        next = { ...next, trips: next.trips.map((x) => (x.id === tripId ? { ...x, travellerIds: [...x.travellerIds!, person.id] } : x)) };
+      return added.length > 0 ? addTickets(next, tripId, added) : next;
+    });
+    await askPermission();
+    router.back();
+  };
+
   const save = async () => {
+    if (personMode) return savePerson();
     if (!hasFlight && !hasCheckout && !hasReturn) {
       Alert.alert('Add a flight or a hotel checkout', 'StashCall needs at least one time to plan around.');
       return;
@@ -291,6 +357,31 @@ export default function EditTrip() {
         ) : null}
       </View>
 
+      {personMode ? (
+        <Section title="Whose flights?">
+          <View style={styles.people}>
+            {travellers(currentTrip!, data.owners).map((p) => {
+              const on = p.id === personId;
+              return (
+                <Pressable
+                  key={p.id}
+                  onPress={() => setPersonId(p.id)}
+                  style={[styles.person, on && styles.personOn]}
+                  accessibilityRole="radio"
+                  accessibilityState={{ checked: on }}
+                >
+                  <Text style={[styles.personText, on && styles.personTextOn]}>{p.name}</Text>
+                </Pressable>
+              );
+            })}
+          </View>
+          <Text style={styles.personHint}>
+            {person ? `${person.name}'s own flights on ${currentTrip!.name}. Everything else on the trip is shared.` : 'Pick whose flights these are.'}
+          </Text>
+        </Section>
+      ) : null}
+
+      {personMode ? null : (
       <Section title="Trip name">
         <TextInput
           value={name}
@@ -304,8 +395,9 @@ export default function EditTrip() {
           returnKeyType="done"
         />
       </Section>
+      )}
 
-      {data.owners.length > 0 ? (
+      {data.owners.length > 0 && !personMode ? (
         <Section title="Who's going?">
           <View style={styles.people}>
             {data.owners.map((p) => {
@@ -371,6 +463,7 @@ export default function EditTrip() {
         ) : null}
       </Section>
 
+      {personMode ? null : (
       <Section title="Hotel checkout">
         <SwitchRow
           label="Remind me before checkout"
@@ -399,6 +492,7 @@ export default function EditTrip() {
           </>
         ) : null}
       </Section>
+      )}
 
       <Section title="Flight home">
         <SwitchRow
@@ -458,8 +552,8 @@ export default function EditTrip() {
         </View>
       ) : null}
 
-      <PrimaryButton label="Save trip" onPress={save} />
-      {existing ? (
+      <PrimaryButton label={personMode ? (person ? `Save ${person.name}'s flights` : 'Save flights') : 'Save trip'} onPress={save} />
+      {existing && !personMode ? (
         <Text style={styles.delete} onPress={remove} accessibilityRole="button">
           Delete trip
         </Text>
@@ -475,6 +569,7 @@ const styles = StyleSheet.create({
   personOn: { backgroundColor: colors.accent, borderColor: colors.accent },
   personText: { fontSize: 15, color: colors.text },
   personTextOn: { color: '#fff', fontWeight: '600' },
+  personHint: { fontSize: 13, color: colors.muted, paddingHorizontal: space.l, paddingBottom: space.m },
   input: { flex: 1, fontSize: 16, color: colors.text, textAlign: 'right' },
   name: { textAlign: 'left', paddingHorizontal: space.l, paddingVertical: 14 },
   fillBox: {

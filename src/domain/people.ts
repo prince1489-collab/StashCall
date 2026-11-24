@@ -1,5 +1,5 @@
 import type { AppData } from '../storage/store';
-import type { Item, LocalDate, Person, Trip } from './types';
+import type { FlightLeg, Item, LocalDate, Person, PersonFlights, Trip } from './types';
 
 /**
  * The household's people: who is going on a trip, whose items go on it,
@@ -59,11 +59,8 @@ export function removePerson(data: AppData, id: string): AppData {
     ...data,
     owners: data.owners.filter((p) => p.id !== id),
     items: data.items.map((i) => (i.ownerId === id ? { ...i, ownerId: undefined } : i)),
-    trips: data.trips.map((t) => {
-      if (!t.travellerIds) return t;
-      const left = t.travellerIds.filter((x) => x !== id);
-      return { ...t, travellerIds: left.length > 0 ? left : undefined };
-    }),
+    // A trip only they were going on keeps an empty list, not "everyone".
+    trips: data.trips.map((t) => (t.travellerIds ? { ...t, travellerIds: t.travellerIds.filter((x) => x !== id) } : t)),
     meId: data.meId === id ? undefined : data.meId,
   };
 }
@@ -74,5 +71,37 @@ export function setTravellers(data: AppData, tripId: string, ids: string[]): App
   return {
     ...data,
     trips: data.trips.map((t) => (t.id === tripId ? { ...t, travellerIds: everyone ? undefined : ids } : t)),
+  };
+}
+
+/**
+ * The trip as one person travels it: their own flights where they have
+ * them, the trip's otherwise. Everything else (hotel, items, ticks) is shared.
+ */
+export function tripFor(trip: Trip, personId?: string): Trip {
+  const own = personId ? trip.personFlights?.[personId] : undefined;
+  if (!own) return trip;
+  const leg = (mine: FlightLeg | null | undefined, shared?: FlightLeg) => (mine === null ? undefined : (mine ?? shared));
+  return { ...trip, flight: leg(own.flight, trip.flight), returnFlight: leg(own.returnFlight, trip.returnFlight) };
+}
+
+const sameLeg = (a: FlightLeg | null | undefined, b?: FlightLeg) => JSON.stringify(a ?? null) === JSON.stringify(b ?? null);
+
+/** Saves one person's flights. Flights that match the trip's are dropped, so later trip edits reach them. */
+export function setPersonFlights(data: AppData, tripId: string, personId: string, flights: PersonFlights): AppData {
+  return {
+    ...data,
+    trips: data.trips.map((t) => {
+      if (t.id !== tripId) return t;
+      // "Not flying" is kept as null, so it doesn't fall back to the trip's flight.
+      const own: PersonFlights = {
+        ...(!sameLeg(flights.flight, t.flight) && { flight: flights.flight ?? null }),
+        ...(!sameLeg(flights.returnFlight, t.returnFlight) && { returnFlight: flights.returnFlight ?? null }),
+      };
+      const rest = { ...t.personFlights };
+      delete rest[personId];
+      const personFlights = 'flight' in own || 'returnFlight' in own ? { ...rest, [personId]: own } : rest;
+      return { ...t, personFlights: Object.keys(personFlights).length > 0 ? personFlights : undefined };
+    }),
   };
 }

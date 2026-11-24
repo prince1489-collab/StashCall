@@ -96,6 +96,12 @@ export interface Trip {
   checkout?: HotelCheckout;
   /** The flight home, planned from the hotel rather than from home. */
   returnFlight?: FlightLeg;
+  /**
+   * Flights for people who travel differently from the trip's own, keyed by
+   * person id: Dad flies Udaipur to Delhi and joins the Delhi flight there.
+   * Each person's phone plans their day from their own flights.
+   */
+  personFlights?: Record<string, PersonFlights>;
   /** Who is going, as person ids. Unset means everyone in the household. */
   travellerIds?: string[];
   /** Items chosen for this trip (ids into the household item list). */
@@ -106,11 +112,22 @@ export interface Trip {
   prep?: Partial<Record<PrepKind, PrepStatus>>;
   /** Photos of this trip's insurance policy or visa. */
   docs?: Partial<Record<'insurance' | 'visa', Ticket[]>>;
+  /** The passport ("person:date") the passport answer was given for. */
+  passportCheckedFor?: string;
   /** When the visa for this trip runs out, if the user told us. */
   visaExpires?: LocalDate;
   /** Item ids ticked off, keyed by timeline step kind. */
   ticked: Partial<Record<StepKind, string[]>>;
   createdAt: string;
+}
+
+/**
+ * One person's own flights on a shared trip. Unset: same as the trip's.
+ * null: they don't take that flight.
+ */
+export interface PersonFlights {
+  flight?: FlightLeg | null;
+  returnFlight?: FlightLeg | null;
 }
 
 /** Things to sort out in the weeks before a trip. */

@@ -39,7 +39,8 @@ function countdown(at: Date, now: Date): string {
 }
 
 export default function Today() {
-  const { data, currentTrip, ready, update } = useAppData();
+  // Shown as this phone's person travels it, with their own flights.
+  const { data, myTrip: currentTrip, ready, update } = useAppData();
   const now = useNow();
   if (!ready) return null;
 

@@ -1,7 +1,7 @@
 import { DEFAULTS } from './defaults';
 import { suggestTripName, type FlightDetails, type TicketDetails } from './ticketParse';
 import { defaultFlight } from './timeline';
-import type { FlightLeg, HotelCheckout } from './types';
+import type { FlightLeg, HotelCheckout, Trip } from './types';
 
 export interface TripDraft {
   name: string;
@@ -55,4 +55,17 @@ export function isReturnOf(outbound: FlightLeg, f: FlightDetails): boolean {
   if (f.from && outbound.destination) return f.from.code === outbound.destination;
   if (f.to && outbound.airport) return f.to.code === outbound.airport;
   return true;
+}
+
+/**
+ * Someone else's flights for the same trip: a different departure that
+ * lands where the trip goes, or leaves within a day of it. Dad's Udaipur
+ * flight to Pantnagar joins the trip rather than starting a new one.
+ */
+export function joinsTrip(trip: Trip, d: TicketDetails): boolean {
+  const f = trip.flight;
+  if (!f || !d.departure || d.departure === f.departure) return false;
+  if (d.to && f.destination && d.to.code === f.destination) return true;
+  const day = (x: string) => Date.parse(`${x.slice(0, 10)}T00:00Z`);
+  return Math.abs(day(d.departure) - day(f.departure)) <= 86400000;
 }

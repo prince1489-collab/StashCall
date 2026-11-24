@@ -193,6 +193,9 @@ function hoursBetween(a: LocalDateTime, b: LocalDateTime): number {
 /** One flight's worth of details. */
 export type FlightDetails = Pick<TicketDetails, 'flightNumber' | 'from' | 'to' | 'departure'>;
 
+/** Airline codes that contain a digit: IndiGo, Go First, AirAsia India, easyJet, Wizz, JetBlue, Frontier, Cebu, Jet. */
+const DIGIT_AIRLINES = new Set(['6E', 'G8', 'I5', 'U2', 'W6', 'B6', 'F9', '5J', '9W']);
+
 /**
  * Splits text at each distinct flight number ("BA137 … BA138 …"). Returns
  * the whole text when there's one flight or none.
@@ -200,8 +203,11 @@ export type FlightDetails = Pick<TicketDetails, 'flightNumber' | 'from' | 'to' |
 function splitByFlight(text: string): string[] {
   const seen = new Set<string>();
   const starts: number[] = [];
-  for (const m of text.matchAll(/\b([A-Z]{2})\s?(\d{1,4})\b/g)) {
+  for (const m of text.matchAll(/\b([A-Z]{2}|[A-Z0-9]{2})\s?(\d{1,4})\b/g)) {
     const code = `${m[1]}${m[2]}`;
+    // Airline codes with a digit ("6E" IndiGo) only from a known list, so
+    // "T1 06:10" (terminal 1) isn't read as a flight.
+    if (/\d/.test(m[1]) && !DIGIT_AIRLINES.has(m[1])) continue;
     if (/^(AM|PM|NO|TO|OF|ON|AT|IN|BY)$/.test(m[1]) || seen.has(code)) continue;
     seen.add(code);
     starts.push(m.index);

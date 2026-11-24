@@ -3,6 +3,7 @@ import type { ReactNode } from 'react';
 
 import type { Trip } from '../domain/types';
 import { removeTrip } from '../domain/household';
+import { tripFor } from '../domain/people';
 import { deleteAllPhotos, deletePhoto } from '../storage/photos';
 import { EMPTY_DATA, clearData, loadData, saveData } from '../storage/store';
 import type { AppData } from '../storage/store';
@@ -12,6 +13,8 @@ interface AppDataContext {
   ready: boolean;
   /** The trip the app is focused on. Phase 1 keeps one active trip. */
   currentTrip?: Trip;
+  /** The current trip as this phone's person travels it: with their own flights, if they have them. For showing and reminding, not for saving. */
+  myTrip?: Trip;
   saveTrip: (trip: Trip) => Promise<void>;
   deleteTrip: (id: string) => Promise<void>;
   update: (fn: (d: AppData) => AppData) => Promise<void>;
@@ -76,6 +79,7 @@ export function AppDataProvider({ children }: { children: ReactNode }) {
       data,
       ready,
       currentTrip: data.trips[0],
+      myTrip: data.trips[0] && tripFor(data.trips[0], data.meId),
       saveTrip,
       deleteTrip,
       update,
