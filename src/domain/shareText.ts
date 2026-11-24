@@ -18,7 +18,7 @@ export function tripChecklistText(
   const blocks = buildTimeline(trip)
     .filter((s) => s.itemMoment)
     .map((s) => {
-      const list = stepItems(trip, items, s);
+      const list = stepItems(trip, items, s, owners);
       if (list.length === 0) return null;
       const done = new Set(trip.ticked[s.kind] ?? []);
       const lines = list.map((i) => {

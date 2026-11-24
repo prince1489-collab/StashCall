@@ -1,5 +1,6 @@
 import { Pressable, StyleSheet, Text, View } from 'react-native';
 
+import { updatePerson } from '../domain/people';
 import { addDoc, docsFor, prepTasks, removeDoc, setPrep, shortDate } from '../domain/prep';
 import type { PrepTask } from '../domain/prep';
 import { instantToZoned } from '../domain/time';
@@ -124,17 +125,20 @@ function describe(t: PrepTask, data: AppData, act: {
     }
 
     case 'passport': {
-      const setExpiry = dated((date) => (d) => ({ ...d, passportExpires: date }));
+      const setExpiry = t.whoseId
+        ? dated((date) => (d) => updatePerson(d, t.whoseId!, { passportExpires: date }))
+        : dated((date) => (d) => ({ ...d, passportExpires: date }));
+      const whose = t.whose ? `${t.whose}'s passport` : 'Your passport';
       if (t.status === 'covered')
         return {
           title: 'Passport',
-          hint: `Valid until ${shortDate(t.date!)}, more than 6 months after you travel.`,
+          hint: `${t.whose ? `${whose} runs out first, on ${shortDate(t.date!)}. That's` : `Valid until ${shortDate(t.date!)},`} more than 6 months after you travel.`,
           choices: [{ label: 'Change date', onPress: setExpiry }],
         };
       if (t.problem === 'passportShort' && t.status === 'todo')
         return {
           title: 'Check your passport',
-          hint: `It runs out on ${shortDate(t.date!)}, less than 6 months after this trip starts. Some countries refuse entry, and renewing can take weeks. ${when ?? ''}`,
+          hint: `${whose} runs out on ${shortDate(t.date!)}, less than 6 months after this trip starts. Some countries refuse entry, and renewing can take weeks. ${when ?? ''}`,
           choices: [
             { label: 'Renewed: new date', onPress: setExpiry },
             { label: "Checked, it's fine", onPress: () => act.set('passport', 'done') },

@@ -1,5 +1,6 @@
 import type { AppData } from '../storage/store';
 import { DEFAULTS } from './defaults';
+import { firstPassport } from './people';
 import { addMinutes, instantToZoned, zonedToInstant } from './time';
 import type { InsuranceCover, Item, LocalDate, Ticket, LocalDateTime, PrepKind, PrepStatus, Trip } from './types';
 
@@ -21,6 +22,9 @@ export interface PrepTask {
    * passport has less than 6 months left when the trip starts.
    */
   problem?: 'insuranceEnds' | 'visaExpires' | 'passportShort';
+  /** Whose passport the date belongs to, when the household has people. */
+  whose?: string;
+  whoseId?: string;
   /** Asked about but not needed by default, like insurance on a domestic trip. */
   optional?: boolean;
   /** The date behind the problem, or the known expiry date. */
@@ -41,7 +45,7 @@ const REMIND_DAYS: Record<PrepKind, [number, number]> = {
 };
 
 /** What the household told us once, for every trip. */
-export type PrepPrefs = Pick<AppData, 'insurance' | 'insuranceEnds' | 'passportExpires'>;
+export type PrepPrefs = Pick<AppData, 'insurance' | 'insuranceEnds' | 'passportExpires'> & Partial<Pick<AppData, 'owners'>>;
 
 /** Countries often want 6 months left on a passport after arrival. */
 export const PASSPORT_MONTHS = 6;
@@ -153,13 +157,17 @@ export function prepTasks(trip: Trip, prefs: PrepPrefs): PrepTask[] {
     );
 
     // Passport: fine with 6 months left at the start; otherwise worth a check.
-    const expires = prefs.passportExpires;
+    // The passport that runs out first among the people going.
+    const first = firstPassport(trip, prefs);
+    const expires = first?.date;
     const short = !!expires && !!dates && expires < addMonths(dates.start, PASSPORT_MONTHS);
     const answered = trip.prep?.passport;
     const status: PrepTask['status'] = answered ?? (expires && !short ? 'covered' : 'todo');
     tasks.push(
       task('passport', 'Passport', status, {
         date: expires,
+        whose: first?.name,
+        whoseId: first?.personId,
         ...(short && { problem: 'passportShort' as const }),
         // Only nag when we know there's a problem; an unknown date just shows on the card.
         ...(!short && { remindAt: [] }),

@@ -98,6 +98,9 @@ export default function Items() {
               ? `Saved for every trip. The switch puts an item on ${currentTrip.name}.`
               : 'Saved for every trip. Add a trip to get reminders.'}
           </Text>
+          <Text style={styles.addLink} onPress={() => router.push('/people')} accessibilityRole="button">
+            {data.owners.length > 0 ? `People: ${data.owners.map((p) => p.name).join(', ')}` : 'Travelling with others? Add people'}
+          </Text>
           <Section>
             {saved.map((item) => (
               <ItemRow

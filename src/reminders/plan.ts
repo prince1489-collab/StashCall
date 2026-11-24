@@ -1,8 +1,8 @@
 import { buildTimeline } from '../domain/timeline';
-import { stepItemNames } from '../domain/tripItems';
+import { reminderItems } from '../domain/tripItems';
 import { prepTasks, shortDate } from '../domain/prep';
 import type { PrepPrefs, PrepTask } from '../domain/prep';
-import type { Item, PrepKind, StepKind, TimelineStep, Trip } from '../domain/types';
+import type { Item, Person, PrepKind, StepKind, TimelineStep, Trip } from '../domain/types';
 
 export interface PlannedReminder {
   /** Stable id: same trip + step → same id, so rescheduling replaces it. */
@@ -106,7 +106,7 @@ function prepText(t: PrepTask): { title: string; body: string } {
           };
     case 'passport':
       return {
-        title: 'Check your passport',
+        title: t.whose ? `Check ${t.whose}'s passport` : 'Check your passport',
         body: `It runs out on ${shortDate(t.date!)}. Many countries want 6 months left when you arrive, and renewing can take weeks.`,
       };
   }
@@ -134,12 +134,17 @@ export function planPrepReminders(trip: Trip, prefs: PrepPrefs, now: Date): Plan
 }
 
 /** Every future reminder for a trip, in time order. */
-export function planReminders(trip: Trip, items: Item[], now: Date): PlannedReminder[] {
+export function planReminders(trip: Trip, items: Item[], now: Date, people: Person[] = [], meId?: string): PlannedReminder[] {
+  // Someone else's item is named with its owner: "Inhaler (Aarav)".
+  const label = (i: Item) => {
+    const owner = i.ownerId && i.ownerId !== meId ? people.find((p) => p.id === i.ownerId) : undefined;
+    return owner ? `${i.name} (${owner.name})` : i.name;
+  };
   const steps = buildTimeline(trip);
   const timeline = steps
     .filter((s) => s.notify && s.at.getTime() > now.getTime())
     .map((s): PlannedReminder | null => {
-      const names = stepItemNames(trip, items, s);
+      const names = reminderItems(trip, items, s, people, meId).map(label);
       const text = textFor(s, steps, names);
       if (!text) return null;
       return {

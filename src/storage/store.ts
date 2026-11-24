@@ -17,7 +17,9 @@ export interface AppData {
   insuranceEnds?: LocalDate;
   /** Photos of the annual or bank policy, shown on every trip. */
   insuranceDocs?: Ticket[];
-  /** The household passport that runs out first, if known. */
+  /** Which person uses this phone, once the household has people. */
+  meId?: string;
+  /** The household passport that runs out first, if known. Used until people have their own dates. */
   passportExpires?: LocalDate;
 }
 

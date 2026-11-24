@@ -1,6 +1,6 @@
 import { router, useLocalSearchParams } from 'expo-router';
 import { useEffect, useMemo, useRef, useState } from 'react';
-import { ActivityIndicator, Alert, ScrollView, StyleSheet, Text, TextInput, View } from 'react-native';
+import { ActivityIndicator, Alert, Pressable, ScrollView, StyleSheet, Text, TextInput, View } from 'react-native';
 
 import { DEFAULTS } from '../../domain/defaults';
 import { savedItems } from '../../domain/household';
@@ -76,6 +76,8 @@ export default function EditTrip() {
 
   // Ticket screenshots added on this screen. They're deleted again if the
   // trip isn't saved, so a cancelled form leaves nothing behind.
+  // Who is going: everyone unless the trip says otherwise.
+  const [going, setGoing] = useState<string[]>(existing?.travellerIds ?? data.owners.map((p) => p.id));
   const [added, setAdded] = useState<Ticket[]>([]);
   const [reading, setReading] = useState(false);
   const [readNote, setReadNote] = useState<string | null>(null);
@@ -224,6 +226,8 @@ export default function EditTrip() {
       returnFlight: draft.returnFlight,
       // A new trip starts with every saved item; the Items tab can take some off.
       itemIds: existing?.itemIds ?? savedItems(data.items).map((i) => i.id),
+      // Everyone going is stored as unset, so people added later join by default.
+      travellerIds: data.owners.length > 0 && data.owners.some((p) => !going.includes(p.id)) ? going : undefined,
       ticked: existing?.ticked ?? {},
       prep: existing?.prep,
       tickets: [...(existing?.tickets ?? []), ...added],
@@ -300,6 +304,27 @@ export default function EditTrip() {
           returnKeyType="done"
         />
       </Section>
+
+      {data.owners.length > 0 ? (
+        <Section title="Who's going?">
+          <View style={styles.people}>
+            {data.owners.map((p) => {
+              const on = going.includes(p.id);
+              return (
+                <Pressable
+                  key={p.id}
+                  onPress={() => setGoing((g) => (on ? g.filter((x) => x !== p.id) : [...g, p.id]))}
+                  style={[styles.person, on && styles.personOn]}
+                  accessibilityRole="checkbox"
+                  accessibilityState={{ checked: on }}
+                >
+                  <Text style={[styles.personText, on && styles.personTextOn]}>{on ? '✓ ' : ''}{p.name}</Text>
+                </Pressable>
+              );
+            })}
+          </View>
+        </Section>
+      ) : null}
 
       <Section title="Flight">
         <SwitchRow label="I'm flying" value={hasFlight} onChange={setHasFlight} />
@@ -445,6 +470,11 @@ export default function EditTrip() {
 
 const styles = StyleSheet.create({
   container: { padding: space.l, paddingBottom: 48 },
+  people: { flexDirection: 'row', flexWrap: 'wrap', gap: space.s, padding: space.l },
+  person: { borderRadius: 999, borderWidth: 1, borderColor: colors.border, paddingHorizontal: 14, paddingVertical: 8 },
+  personOn: { backgroundColor: colors.accent, borderColor: colors.accent },
+  personText: { fontSize: 15, color: colors.text },
+  personTextOn: { color: '#fff', fontWeight: '600' },
   input: { flex: 1, fontSize: 16, color: colors.text, textAlign: 'right' },
   name: { textAlign: 'left', paddingHorizontal: space.l, paddingVertical: 14 },
   fillBox: {

@@ -17,7 +17,7 @@ export default function Settings() {
   const deleteAll = () =>
     Alert.alert(
       'Delete all your data?',
-      'This removes your trips, items, owners and photos from this phone and cancels every reminder. It cannot be undone.',
+      'This removes your trips, items, people and photos from this phone and cancels every reminder. It cannot be undone.',
       [
         { text: 'Cancel', style: 'cancel' },
         {
@@ -35,6 +35,12 @@ export default function Settings() {
     <ScrollView contentContainerStyle={styles.container}>
       <Text style={styles.heading}>Reminders</Text>
       <ReminderStatus />
+
+      <Section title="People">
+        <Text style={styles.action} onPress={() => router.push('/people')} accessibilityRole="button">
+          {data.owners.length > 0 ? data.owners.map((p) => p.name).join(', ') : 'Add the people you travel with'}
+        </Text>
+      </Section>
 
       <Section title="Travel insurance">
         {(Object.keys(COVER_LABELS) as InsuranceCover[]).map((c) => (
@@ -65,6 +71,11 @@ export default function Settings() {
       </Section>
 
       <Section title="Passport">
+        {data.owners.length > 0 ? (
+          <Text style={styles.action} onPress={() => router.push('/people')} accessibilityRole="button">
+            Each person's passport date is on People
+          </Text>
+        ) : (
         <Text
           style={styles.option}
           onPress={() => pickDate(data.passportExpires, (date) => update((d) => ({ ...d, passportExpires: date })))}
@@ -72,6 +83,7 @@ export default function Settings() {
         >
           Expires: <Text style={styles.optionOn}>{data.passportExpires ? shortDate(data.passportExpires) : 'Add date'}</Text>
         </Text>
+        )}
         <Text style={styles.note}>
           The passport in your household that runs out first. Many countries want 6 months left when you arrive, so
           StashCall warns you in time to renew.

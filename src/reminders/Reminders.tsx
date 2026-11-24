@@ -44,7 +44,7 @@ export function RemindersProvider({ children }: { children: ReactNode }) {
         setExact(ex);
         const now = new Date();
         const plan = currentTrip
-          ? [...planPrepReminders(currentTrip, data, now), ...planReminders(currentTrip, data.items, now)]
+          ? [...planPrepReminders(currentTrip, data, now), ...planReminders(currentTrip, data.items, now, data.owners, data.meId)]
           : [];
         setScheduled(await syncReminders(plan, data.trips.map((t) => t.id)));
       }),

@@ -75,7 +75,7 @@ export default function TripScreen() {
       <BeforeYouGo trip={currentTrip} />
       <Tickets trip={currentTrip} />
       <ReminderStatus />
-      <Timeline steps={steps} now={now} itemsFor={(s) => stepItemNames(currentTrip, data.items, s)} />
+      <Timeline steps={steps} now={now} itemsFor={(s) => stepItemNames(currentTrip, data.items, s, data.owners)} />
     </ScrollView>
   );
 }
