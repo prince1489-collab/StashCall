@@ -39,7 +39,8 @@ export default function Household() {
     try {
       await fn();
     } catch (e) {
-      Alert.alert("That didn't work", e instanceof Error ? e.message : 'Check your connection and try again.');
+      const message = (e as { message?: unknown } | null)?.message;
+      Alert.alert("That didn't work", typeof message === 'string' && message ? message : 'Check your connection and try again.');
     } finally {
       setBusy(false);
     }
@@ -113,7 +114,7 @@ export default function Household() {
             </Section>
           ) : (
             <Text style={styles.note}>
-              This phone is {data.owners.find((p) => p.id === data.meId)?.name ?? 'yours'}'s. Its reminders cover your items,
+              This phone is {phoneOwner(data.owners.find((p) => p.id === data.meId)?.name)}. Its reminders cover your items,
               shared items, and anyone without the app.
             </Text>
           )}
@@ -166,3 +167,9 @@ const styles = StyleSheet.create({
   note: { fontSize: 13, color: colors.muted, lineHeight: 19 },
   input: { fontSize: 20, color: colors.text, padding: space.l, letterSpacing: 3, fontFamily: fonts.bold },
 });
+
+/** "Dad's", or "yours" when there's no name or the person is called "Me". */
+function phoneOwner(name: string | undefined): string {
+  const n = name?.trim();
+  return !n || n.toLowerCase() === 'me' ? 'yours' : `${n}'s`;
+}
