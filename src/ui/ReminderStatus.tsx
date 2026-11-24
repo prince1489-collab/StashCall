@@ -6,7 +6,7 @@ import { openAlarmSoundSettings, sendTestReminder } from '../reminders/schedule'
 import { colors, space } from './theme';
 
 /** Shows whether reminders are set, fixes permission problems, and offers a test. */
-export function ReminderStatus() {
+export function ReminderStatus({ problemsOnly = false }: { problemsOnly?: boolean } = {}) {
   const { permission, exact, scheduled, askPermission, askExact } = useReminders();
 
   const test = async () => {
@@ -42,10 +42,13 @@ export function ReminderStatus() {
     );
   }
 
+  // Today only speaks up when reminders might not arrive.
+  if (problemsOnly && exact) return null;
+
   return (
     <View style={styles.card}>
       <Text style={styles.title}>
-        {scheduled === 0 ? 'No reminders left for this trip' : `${scheduled} reminder${scheduled > 1 ? 's' : ''} set`}
+        {scheduled === 0 ? 'No reminders coming up' : `${scheduled} reminder${scheduled > 1 ? 's' : ''} set`}
       </Text>
       {!exact ? (
         <>

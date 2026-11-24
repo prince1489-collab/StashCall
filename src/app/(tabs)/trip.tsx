@@ -4,10 +4,12 @@ import { Pressable, ScrollView, Share, StyleSheet, Text, View } from 'react-nati
 import { travellers, tripFor } from '../../domain/people';
 import { tripChecklistText } from '../../domain/shareText';
 import { buildTimeline } from '../../domain/timeline';
+import { pastTrips, tripSpan, upcomingTrips } from '../../domain/trips';
 import { stepItemNames } from '../../domain/tripItems';
 import type { Trip } from '../../domain/types';
 import { useNow } from '../../hooks/useNow';
 import { useAppData } from '../../state/AppData';
+import { useSync } from '../../sync/SyncProvider';
 import { BeforeYouGo } from '../../ui/BeforeYouGo';
 import { PrimaryButton, formatLocalDate } from '../../ui/Form';
 import { PlaneIcon } from '../../ui/Icons';
@@ -39,6 +41,7 @@ export default function TripScreen() {
     Share.share({ message: tripChecklistText(currentTrip, data.items, data.owners, formatLocalDate) }).catch(() => {});
   return (
     <ScrollView contentContainerStyle={styles.container}>
+      <TripPicker />
       <View style={styles.header}>
         <Text style={styles.title}>{currentTrip.name}</Text>
         <Link href="/trip/edit" style={styles.edit} accessibilityRole="button">
@@ -69,6 +72,7 @@ export default function TripScreen() {
           </View>
         </View>
       ) : null}
+      <SharedWith />
       {sharedTrip ? <WhoFlies trip={sharedTrip} /> : null}
       <Text style={styles.note}>
         Estimates are worked out from your flight or checkout time. Tap Edit to change any assumption.
@@ -81,6 +85,55 @@ export default function TripScreen() {
       <ReminderStatus />
       <Timeline steps={steps} now={now} itemsFor={(s) => stepItemNames(currentTrip, data.items, s, data.owners)} />
     </ScrollView>
+  );
+}
+
+/** Every trip, next first, then the ones that are over. Tap one to open it. */
+function TripPicker() {
+  const { data, currentTrip, viewTrip } = useAppData();
+  if (data.trips.length < 2) return null;
+  const now = new Date();
+  const trips = [...upcomingTrips(data.trips, now), ...pastTrips(data.trips, now)];
+  return (
+    <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.picker}>
+      {trips.map((t) => {
+        const on = t.id === currentTrip?.id;
+        const start = tripSpan(t)?.start;
+        const over = (tripSpan(t)?.end.getTime() ?? Infinity) < now.getTime();
+        return (
+          <Pressable
+            key={t.id}
+            onPress={() => viewTrip(t.id)}
+            style={[styles.pick, on && styles.pickOn]}
+            accessibilityRole="button"
+            accessibilityState={{ selected: on }}
+          >
+            <Text style={[styles.pickName, on && styles.pickNameOn]} numberOfLines={1}>
+              {t.name}
+            </Text>
+            <Text style={[styles.pickWhen, on && styles.pickWhenOn]}>
+              {over ? 'Over' : start ? start.toLocaleDateString('en-GB', { day: 'numeric', month: 'short', year: start.getFullYear() === now.getFullYear() ? undefined : 'numeric' }) : 'No date yet'}
+            </Text>
+          </Pressable>
+        );
+      })}
+    </ScrollView>
+  );
+}
+
+/** Who else sees this trip, when family sharing is on. */
+function SharedWith() {
+  const { data } = useAppData();
+  const sync = useSync();
+  if (!sync.inviteCode) return null;
+  const others = data.owners.filter((p) => p.ownPhone && p.id !== data.meId).map((p) => p.name);
+  const who = others.length > 0 ? `Shared with ${others.join(' and ')}` : 'Shared, waiting for family to join';
+  const state = sync.status === 'synced' ? 'up to date' : sync.status === 'syncing' ? 'syncing' : sync.status === 'offline' ? 'offline for now' : '';
+  return (
+    <Text style={styles.shared} onPress={() => router.push('/household')} accessibilityRole="button">
+      {who}
+      {state ? ` · ${state}` : ''}
+    </Text>
   );
 }
 
@@ -121,6 +174,14 @@ function WhoFlies({ trip }: { trip: Trip }) {
 }
 
 const styles = StyleSheet.create({
+  picker: { gap: space.s, paddingBottom: space.m },
+  pick: { backgroundColor: colors.card, borderRadius: 14, borderWidth: StyleSheet.hairlineWidth, borderColor: colors.border, paddingHorizontal: space.m, paddingVertical: space.s, maxWidth: 180 },
+  pickOn: { backgroundColor: colors.accent, borderColor: colors.accent },
+  pickName: { fontSize: 14, fontFamily: fonts.bold, color: colors.text },
+  pickNameOn: { color: '#fff' },
+  pickWhen: { fontSize: 12, color: colors.muted, marginTop: 2 },
+  pickWhenOn: { color: colors.onAccentMuted },
+  shared: { fontSize: 14, color: colors.accent, fontWeight: '600', marginTop: space.m },
   who: { backgroundColor: colors.card, borderRadius: 16, borderWidth: StyleSheet.hairlineWidth, borderColor: colors.border, padding: space.l, marginTop: space.m, gap: space.s },
   whoHeading: { fontSize: 12, fontWeight: '600', letterSpacing: 0.8, textTransform: 'uppercase', color: colors.muted },
   whoRow: { flexDirection: 'row', alignItems: 'center', gap: space.m, paddingVertical: space.xs },
