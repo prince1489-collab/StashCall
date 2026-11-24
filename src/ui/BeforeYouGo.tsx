@@ -77,6 +77,12 @@ function describe(t: PrepTask, data: AppData, act: {
           ],
           docs: 'insurance',
         };
+      if (t.optional)
+        return {
+          title: 'Travel insurance',
+          hint: 'Optional for a trip within one country.',
+          choices: [{ label: 'I bought cover', onPress: () => act.set('insurance', 'done') }],
+        };
       return {
         title: 'Travel insurance',
         hint: t.status === 'notNeeded' ? 'Not needed for this trip.' : 'Sorted. Keep a photo of the policy here.',
@@ -189,7 +195,7 @@ export function BeforeYouGo({ trip, compact }: { trip: Trip; compact?: boolean }
           <View key={t.kind} style={styles.task}>
             <Pressable
               style={styles.row}
-              onPress={() => (t.status === 'covered' || (t.problem && !done) ? undefined : act.set(t.kind, done ? undefined : 'done'))}
+              onPress={() => (t.status === 'covered' || t.optional || (t.problem && !done) ? undefined : act.set(t.kind, done ? undefined : 'done'))}
               accessibilityRole="checkbox"
               accessibilityState={{ checked: done }}
               accessibilityLabel={v.title}

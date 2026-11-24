@@ -21,6 +21,8 @@ export interface PrepTask {
    * passport has less than 6 months left when the trip starts.
    */
   problem?: 'insuranceEnds' | 'visaExpires' | 'passportShort';
+  /** Asked about but not needed by default, like insurance on a domestic trip. */
+  optional?: boolean;
   /** The date behind the problem, or the known expiry date. */
   date?: LocalDate;
   /** When the reminders for an open task go off, in time order. */
@@ -48,6 +50,11 @@ export const VISA_ITEM_NAME = 'Visa or e-visa';
 
 export function isInternational(trip: Pick<Trip, 'flight' | 'returnFlight'>): boolean {
   return !!(trip.flight?.international || trip.returnFlight?.international);
+}
+
+/** A trip with flights, none of them leaving the country. */
+export function isDomestic(trip: Pick<Trip, 'flight' | 'returnFlight'>): boolean {
+  return !!(trip.flight || trip.returnFlight) && !isInternational(trip);
 }
 
 /** The first fixed time of the trip and its zone, plus the evening reminder time. */
@@ -124,6 +131,9 @@ export function prepTasks(trip: Trip, prefs: PrepPrefs): PrepTask[] {
   const policyEndsFirst = policy && !!prefs.insuranceEnds && !!dates && prefs.insuranceEnds < dates.end;
   if (policy && !policyEndsFirst) {
     tasks.push(task('insurance', 'Travel insurance', 'covered', { date: prefs.insuranceEnds }));
+  } else if (isDomestic(trip) && !trip.prep?.insurance) {
+    // Few people insure a flight within their own country: mention it, don't nag.
+    tasks.push(task('insurance', 'Travel insurance', 'notNeeded', { optional: true, remindAt: [] }));
   } else {
     tasks.push(
       task('insurance', 'Travel insurance', trip.prep?.insurance ?? 'todo', {
