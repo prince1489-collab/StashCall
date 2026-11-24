@@ -1,11 +1,16 @@
+import { useState } from 'react';
 import { StyleSheet, Text, View } from 'react-native';
 
 import { instantToZoned } from '../domain/time';
+import { itemCountLabel } from '../domain/tripItems';
 import type { TimelineStep } from '../domain/types';
 import { formatLocalDate, zoneLabel } from './Form';
 import { colors, fonts, space } from './theme';
 
-/** A vertical list of timeline steps, grouped by day. */
+/**
+ * A vertical list of timeline steps, grouped by day. Reminder steps show a
+ * count of their items ("7 items to pack"); tap it to see the names.
+ */
 export function Timeline({
   steps,
   now = new Date(),
@@ -16,6 +21,7 @@ export function Timeline({
   /** Names of the items a reminder step covers. */
   itemsFor?: (step: TimelineStep) => string[];
 }) {
+  const [openStep, setOpenStep] = useState<number | null>(null);
   let lastDay = '';
   const zones = new Set(steps.map((s) => s.timeZone));
   return (
@@ -34,12 +40,17 @@ export function Timeline({
               <Text style={styles.time}>{s.localTime}</Text>
               <View style={styles.body}>
                 <Text style={styles.title}>{s.title}</Text>
-                <Text style={styles.meta}>
-                  {s.estimate ? 'Estimate' : 'Your time'}
-                  {zones.size > 1 ? ` · ${zoneLabel(s.timeZone)} time` : ''}
-                  {s.notify ? ' · Reminder' : ''}
-                </Text>
-                {items.length > 0 ? <Text style={styles.items}>{items.join(' · ')}</Text> : null}
+                {zones.size > 1 ? <Text style={styles.meta}>{zoneLabel(s.timeZone)} time</Text> : null}
+                {items.length > 0 ? (
+                  <Text
+                    style={styles.items}
+                    onPress={() => setOpenStep(openStep === i ? null : i)}
+                    accessibilityRole="button"
+                    accessibilityState={{ expanded: openStep === i }}
+                  >
+                    {openStep === i ? items.join(' · ') : `${itemCountLabel(s, items.length)} ›`}
+                  </Text>
+                ) : null}
               </View>
             </View>
           </View>

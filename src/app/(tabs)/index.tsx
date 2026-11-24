@@ -18,6 +18,9 @@ import { Tickets } from '../../ui/Tickets';
 import { Timeline } from '../../ui/Timeline';
 import { colors, fonts, space } from '../../ui/theme';
 
+/** Item chips on the Next card before "+N more". */
+const CHIPS = 3;
+
 const HOW_IT_WORKS = [
   { title: 'Add your trip', text: 'Type your flight time, or share a screenshot of your booking.' },
   { title: 'Pick what you tend to forget', text: 'Passports, chargers, glasses, the kids\' toys.' },
@@ -74,6 +77,7 @@ export default function Today() {
   const openItems = open ? stepItems(currentTrip, data.items, open) : [];
   const trip = currentTrip;
   const next = upcoming[0];
+  const nextNames = next ? stepItemNames(currentTrip, data.items, next) : [];
 
   return (
     <ScrollView contentContainerStyle={styles.container}>
@@ -104,13 +108,16 @@ export default function Today() {
           </View>
           <Text style={styles.nextTime}>{next.localTime}</Text>
           <Text style={styles.nextTitle}>{next.title}</Text>
-          {stepItemNames(currentTrip, data.items, next).length > 0 ? (
+          {nextNames.length > 0 ? (
             <View style={styles.chips}>
-              {stepItemNames(currentTrip, data.items, next).map((name) => (
+              {nextNames.slice(0, CHIPS).map((name) => (
                 <Text key={name} style={styles.chip}>
                   {name}
                 </Text>
               ))}
+              {nextNames.length > CHIPS ? (
+                <Text style={[styles.chip, styles.chipMore]}>+{nextNames.length - CHIPS} more</Text>
+              ) : null}
             </View>
           ) : null}
         </View>
@@ -168,6 +175,7 @@ const styles = StyleSheet.create({
     paddingVertical: 6,
     overflow: 'hidden',
   },
+  chipMore: { backgroundColor: 'rgba(255,255,255,0.14)', color: '#fff' },
   section: { fontSize: 13, fontWeight: '600', color: colors.muted, textTransform: 'uppercase', marginTop: space.xl },
   empty: { flexGrow: 1, justifyContent: 'center', padding: space.xl, gap: space.l },
   brandRow: { flexDirection: 'row', alignItems: 'center', gap: space.m },
