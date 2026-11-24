@@ -101,6 +101,8 @@ export default function EditTrip() {
   const [readText, setReadText] = useState<string | null>(null);
   const [showText, setShowText] = useState(false);
   const saved = useRef(false);
+  // Which legs came from a screenshot, so picking a different person keeps them.
+  const fromTicket = useRef({ flight: false, returnFlight: false });
   // False while the flight is still the blank form's placeholder.
   const flightTouched = useRef(false);
   const addedRef = useRef(added);
@@ -124,6 +126,7 @@ export default function EditTrip() {
     // outbound flight: fill in the flight home and leave the rest alone.
     const outbound = hasFlight && (existing?.flight || flightTouched.current) ? flight : undefined;
     if (outbound && !d.returnFlight && !d.checkout && isReturnOf(outbound, d)) {
+      fromTicket.current.returnFlight = true;
       setHasReturn(true);
       setReturnFlight(flightLeg(d, hasCheckout ? checkout.timeZone : deviceZone(), hasCheckout && !!checkout.timeZoneConfirmed));
       setReadNote(`Added your flight home: ${describeTicket(d, formatLocalDate)}. Check the times before saving.`);
@@ -133,6 +136,7 @@ export default function EditTrip() {
     // The whole round-trip booking, for a trip that already has this outbound
     // flight: add the flight home and keep the user's outbound settings.
     if (outbound && draft.returnFlight && d.departure === outbound.departure) {
+      fromTicket.current.returnFlight = true;
       setHasReturn(true);
       setReturnFlight(draft.returnFlight);
       setReadNote(`Added your flight home: ${describeTicket(d.returnFlight!, formatLocalDate)}. Check the times before saving.`);
@@ -140,6 +144,7 @@ export default function EditTrip() {
     }
     setName((n) => n.trim() || draft.name);
     if (draft.flight) {
+      fromTicket.current.flight = true;
       flightTouched.current = true;
       setHasFlight(true);
       setFlight(draft.flight);
@@ -153,22 +158,28 @@ export default function EditTrip() {
       setCheckout(draft.checkout);
     }
     if (draft.returnFlight) {
+      fromTicket.current.returnFlight = true;
       setHasReturn(true);
       setReturnFlight(draft.returnFlight);
     }
     setReadNote(`Filled in from your screenshot: ${describeTicket(d, formatLocalDate)}. Check the times before saving.`);
   };
 
-  // Picking someone else (without a screenshot to keep) shows their flights.
+  // Picking someone else shows their flights, except a leg read from the
+  // screenshot, which is what the user is assigning to them.
   const firstPerson = useRef(personId);
   useEffect(() => {
-    if (!personMode || personId === firstPerson.current || added.length > 0) return;
+    if (!personMode || personId === firstPerson.current) return;
     firstPerson.current = personId;
     const theirs = tripFor(currentTrip!, personId);
-    setHasFlight(!!theirs.flight);
-    if (theirs.flight) setFlight(theirs.flight);
-    setHasReturn(!!theirs.returnFlight);
-    if (theirs.returnFlight) setReturnFlight(theirs.returnFlight);
+    if (!fromTicket.current.flight) {
+      setHasFlight(!!theirs.flight);
+      if (theirs.flight) setFlight(theirs.flight);
+    }
+    if (!fromTicket.current.returnFlight) {
+      setHasReturn(!!theirs.returnFlight);
+      if (theirs.returnFlight) setReturnFlight(theirs.returnFlight);
+    }
   }, [personId]); // eslint-disable-line react-hooks/exhaustive-deps
 
   // A screenshot shared to StashCall arrives already read.
