@@ -1,0 +1,208 @@
+import AsyncStorage from '@react-native-async-storage/async-storage';
+import { createContext, useCallback, useContext, useEffect, useMemo, useRef, useState } from 'react';
+import type { ReactNode } from 'react';
+import { AppState } from 'react-native';
+
+import { useAppData } from '../state/AppData';
+import { ensureSignedIn, SHARING_SET_UP, supabase } from './client';
+import { applyRemote, changesToPush, markPushed } from './records';
+import type { SyncRow, SyncState } from './records';
+
+/** What this phone remembers about sharing. Never shared itself. */
+interface Stored {
+  householdId?: string;
+  inviteCode?: string;
+  state: SyncState;
+  /** Server time of the newest record pulled so far. */
+  lastPull?: string;
+}
+
+const KEY = 'stashcall:sync';
+const EMPTY: Stored = { state: {} };
+
+export type SyncStatus = 'not-set-up' | 'off' | 'syncing' | 'synced' | 'offline';
+
+interface SyncContext {
+  status: SyncStatus;
+  inviteCode?: string;
+  /** Starts a household from this phone's data. Returns the invite code. */
+  create: () => Promise<string>;
+  /** Joins with an invite code. False when the code is wrong. */
+  join: (code: string) => Promise<boolean>;
+  /** Stops sharing on this phone. Its data stays on the phone. */
+  leave: () => Promise<void>;
+  syncNow: () => Promise<void>;
+}
+
+const Ctx = createContext<SyncContext | null>(null);
+
+/** Wait after a change before sending, so a burst of ticks goes in one request. */
+const PUSH_DELAY_MS = 1500;
+
+export function SyncProvider({ children }: { children: ReactNode }) {
+  const { data, ready, update } = useAppData();
+  const [stored, setStored] = useState<Stored>(EMPTY);
+  const [loaded, setLoaded] = useState(false);
+  const [status, setStatus] = useState<SyncStatus>(SHARING_SET_UP ? 'off' : 'not-set-up');
+  const storedRef = useRef(stored);
+  const dataRef = useRef(data);
+  dataRef.current = data;
+  // One sync at a time; a request during a run asks for one more run.
+  const running = useRef<Promise<void> | null>(null);
+  const again = useRef(false);
+
+  const save = useCallback(async (next: Stored) => {
+    storedRef.current = next;
+    setStored(next);
+    await AsyncStorage.setItem(KEY, JSON.stringify(next));
+  }, []);
+
+  useEffect(() => {
+    AsyncStorage.getItem(KEY)
+      .then((raw) => {
+        const s = raw ? ({ ...EMPTY, ...JSON.parse(raw) } as Stored) : EMPTY;
+        storedRef.current = s;
+        setStored(s);
+      })
+      .catch(() => {})
+      .finally(() => setLoaded(true));
+  }, []);
+
+  /** Pull what changed on the server, then send what changed here. */
+  const runOnce = useCallback(async () => {
+    const sb = supabase();
+    const s = storedRef.current;
+    if (!sb || !s.householdId) return;
+    setStatus('syncing');
+    try {
+      await ensureSignedIn(sb);
+      let query = sb.from('records').select('kind,id,data,deleted,updated_at').eq('household_id', s.householdId);
+      // Overlap a minute: a slow save can land with a slightly older server time.
+      if (s.lastPull) query = query.gte('updated_at', new Date(Date.parse(s.lastPull) - 60_000).toISOString());
+      const { data: rows, error } = await query.order('updated_at');
+      if (error) throw error;
+      let state = s.state;
+      if (rows && rows.length > 0) {
+        await update((d) => {
+          const r = applyRemote(d, state, rows as SyncRow[]);
+          state = r.state;
+          return r.data;
+        });
+      }
+      const lastPull = rows && rows.length > 0 ? (rows[rows.length - 1] as SyncRow).updated_at : s.lastPull;
+
+      const outgoing = changesToPush(dataRef.current, state);
+      if (outgoing.length > 0) {
+        const { error: pushError } = await sb
+          .from('records')
+          .upsert(outgoing.map((r) => ({ ...r, household_id: s.householdId })));
+        if (pushError) throw pushError;
+        state = markPushed(state, outgoing);
+      }
+      await save({ ...storedRef.current, state, lastPull });
+      setStatus('synced');
+    } catch {
+      // No signal, or the server is unreachable: try again on the next change or when the app opens.
+      setStatus('offline');
+    }
+  }, [save, update]);
+
+  const syncNow = useCallback(async () => {
+    if (running.current) {
+      again.current = true;
+      return running.current;
+    }
+    running.current = (async () => {
+      do {
+        again.current = false;
+        await runOnce();
+      } while (again.current);
+    })().finally(() => {
+      running.current = null;
+    });
+    return running.current;
+  }, [runOnce]);
+
+  // Send local changes shortly after they happen.
+  useEffect(() => {
+    if (!ready || !loaded || !stored.householdId) return;
+    const t = setTimeout(() => void syncNow(), PUSH_DELAY_MS);
+    return () => clearTimeout(t);
+  }, [data, ready, loaded, stored.householdId, syncNow]);
+
+  // Live changes from the other phones, and a catch-up whenever the app opens.
+  useEffect(() => {
+    const sb = supabase();
+    if (!sb || !stored.householdId) return;
+    const channel = sb
+      .channel(`household:${stored.householdId}`)
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'records', filter: `household_id=eq.${stored.householdId}` }, () => void syncNow())
+      .subscribe();
+    const sub = AppState.addEventListener('change', (st) => {
+      if (st === 'active') void syncNow();
+    });
+    return () => {
+      sub.remove();
+      void sb.removeChannel(channel);
+    };
+  }, [stored.householdId, syncNow]);
+
+  const create = useCallback(async () => {
+    const sb = supabase();
+    if (!sb) throw new Error('Sharing is not set up in this build.');
+    await ensureSignedIn(sb);
+    const { data: rows, error } = await sb.rpc('create_household');
+    if (error || !rows?.[0]) throw error ?? new Error('Could not start sharing.');
+    const { id, invite_code } = rows[0] as { id: string; invite_code: string };
+    await save({ householdId: id, inviteCode: invite_code, state: {} });
+    await syncNow();
+    return invite_code;
+  }, [save, syncNow]);
+
+  const join = useCallback(
+    async (code: string) => {
+      const sb = supabase();
+      if (!sb) throw new Error('Sharing is not set up in this build.');
+      await ensureSignedIn(sb);
+      const { data: id, error } = await sb.rpc('join_household', { code });
+      if (error) throw error;
+      if (!id) return false;
+      await save({ householdId: id as string, inviteCode: code.trim().toUpperCase(), state: {} });
+      await syncNow();
+      return true;
+    },
+    [save, syncNow],
+  );
+
+  const leave = useCallback(async () => {
+    const sb = supabase();
+    const id = storedRef.current.householdId;
+    await save(EMPTY);
+    setStatus(SHARING_SET_UP ? 'off' : 'not-set-up');
+    if (sb && id) {
+      const { data: session } = await sb.auth.getSession();
+      const uid = session.session?.user.id;
+      if (uid) await sb.from('members').delete().eq('household_id', id).eq('user_id', uid);
+    }
+  }, [save]);
+
+  const value = useMemo<SyncContext>(
+    () => ({
+      status: stored.householdId ? status : SHARING_SET_UP ? 'off' : 'not-set-up',
+      inviteCode: stored.inviteCode,
+      create,
+      join,
+      leave,
+      syncNow,
+    }),
+    [status, stored.householdId, stored.inviteCode, create, join, leave, syncNow],
+  );
+
+  return <Ctx.Provider value={value}>{children}</Ctx.Provider>;
+}
+
+export function useSync(): SyncContext {
+  const ctx = useContext(Ctx);
+  if (!ctx) throw new Error('useSync must be used inside SyncProvider');
+  return ctx;
+}

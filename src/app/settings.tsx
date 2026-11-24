@@ -4,6 +4,7 @@ import { Alert, ScrollView, StyleSheet, Text } from 'react-native';
 
 import { sendFeedback } from '../feedback/sendFeedback';
 import { useAppData } from '../state/AppData';
+import { useSync } from '../sync/SyncProvider';
 import type { InsuranceCover } from '../domain/types';
 import { COVER_LABELS } from '../ui/BeforeYouGo';
 import { shortDate } from '../domain/prep';
@@ -13,6 +14,7 @@ import { colors, space } from '../ui/theme';
 
 export default function Settings() {
   const { data, resetAll, update } = useAppData();
+  const sync = useSync();
 
   const deleteAll = () =>
     Alert.alert(
@@ -24,6 +26,7 @@ export default function Settings() {
           text: 'Delete everything',
           style: 'destructive',
           onPress: async () => {
+            await sync.leave().catch(() => {});
             await resetAll();
             router.back();
           },
@@ -35,6 +38,12 @@ export default function Settings() {
     <ScrollView contentContainerStyle={styles.container}>
       <Text style={styles.heading}>Reminders</Text>
       <ReminderStatus />
+
+      <Section title="Family sharing">
+        <Text style={styles.action} onPress={() => router.push('/household')} accessibilityRole="button">
+          Share trips with the people you travel with
+        </Text>
+      </Section>
 
       <Section title="People">
         <Text style={styles.action} onPress={() => router.push('/people')} accessibilityRole="button">
@@ -92,10 +101,10 @@ export default function Settings() {
 
       <Section title="Your data">
         <Row
-          label="Stored on this phone only"
+          label="Stored on this phone"
           hint={`${data.trips.length} trip${data.trips.length === 1 ? '' : 's'}, ${data.items.length} item${
             data.items.length === 1 ? '' : 's'
-          }. Nothing is sent to a server.`}
+          }. Nothing is sent to a server unless you turn on family sharing. Photos never are.`}
         />
         <Text style={[styles.action, { color: colors.danger }]} onPress={deleteAll} accessibilityRole="button">
           Delete all my data

@@ -12,6 +12,7 @@ import { RemindersProvider } from '../reminders/Reminders';
 import { configureNotifications } from '../reminders/schedule';
 import { ShareInbox } from '../share/ShareInbox';
 import { AppDataProvider } from '../state/AppData';
+import { SyncProvider } from '../sync/SyncProvider';
 import { colors, fonts } from '../ui/theme';
 
 configureNotifications();
@@ -29,26 +30,30 @@ export default function RootLayout() {
   return (
     <ShareIntentProvider>
       <AppDataProvider>
-        <RemindersProvider>
-          <NotificationActions />
-          <ShareInbox />
-          <StatusBar style="dark" />
-          <Stack
-            screenOptions={{
-              contentStyle: { backgroundColor: colors.bg },
-              headerTintColor: colors.accent,
-              headerStyle: { backgroundColor: colors.bg },
-              headerShadowVisible: false,
-              headerTitleStyle: { fontFamily: fonts.bold },
-            }}
-          >
-            <Stack.Screen name="(tabs)" options={{ headerShown: false }} />
-            <Stack.Screen name="trip/edit" options={{ presentation: 'modal', title: 'Trip' }} />
-            <Stack.Screen name="item/edit" options={{ presentation: 'modal', title: 'Item' }} />
-            <Stack.Screen name="settings" options={{ title: 'Settings' }} />
-            <Stack.Screen name="people" options={{ title: 'People' }} />
-          </Stack>
-        </RemindersProvider>
+        <SyncProvider>
+          <RemindersProvider>
+            <NotificationActions />
+            <ShareInbox />
+            <StatusBar style="dark" />
+            <Stack
+              screenOptions={{
+                contentStyle: { backgroundColor: colors.bg },
+                headerTintColor: colors.accent,
+                headerStyle: { backgroundColor: colors.bg },
+                headerShadowVisible: false,
+                headerTitleStyle: { fontFamily: fonts.bold },
+              }}
+            >
+              <Stack.Screen name="(tabs)" options={{ headerShown: false }} />
+              <Stack.Screen name="trip/edit" options={{ presentation: 'modal', title: 'Trip' }} />
+              <Stack.Screen name="item/edit" options={{ presentation: 'modal', title: 'Item' }} />
+              <Stack.Screen name="settings" options={{ title: 'Settings' }} />
+              <Stack.Screen name="people" options={{ title: 'People' }} />
+              <Stack.Screen name="household" options={{ title: 'Family sharing' }} />
+              <Stack.Screen name="join" options={{ headerShown: false }} />
+            </Stack>
+          </RemindersProvider>
+        </SyncProvider>
       </AppDataProvider>
     </ShareIntentProvider>
   );
