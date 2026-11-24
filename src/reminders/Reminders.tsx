@@ -26,7 +26,8 @@ const Ctx = createContext<RemindersContext | null>(null);
  * to the foreground (to pick up permission changes made in Settings).
  */
 export function RemindersProvider({ children }: { children: ReactNode }) {
-  const { data, ready, currentTrip } = useAppData();
+  // Reminders follow this phone's person's own flights.
+  const { data, ready, myTrip: currentTrip } = useAppData();
   const [permission, setPermission] = useState<PermissionState>('undetermined');
   const [exact, setExact] = useState(true);
   const [scheduled, setScheduled] = useState(0);
@@ -48,7 +49,7 @@ export function RemindersProvider({ children }: { children: ReactNode }) {
           : [];
         setScheduled(await syncReminders(plan, data.trips.map((t) => t.id)));
       }),
-    [queue, currentTrip, data.items, data.trips, data.insurance, data.insuranceEnds, data.passportExpires],
+    [queue, currentTrip, data.items, data.trips, data.insurance, data.insuranceEnds, data.passportExpires, data.owners, data.meId],
   );
 
   useEffect(() => {

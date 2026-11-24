@@ -4,6 +4,7 @@ import { useEffect, useRef } from 'react';
 import { tickAll } from '../domain/checklist';
 import { setPrep } from '../domain/prep';
 import { buildTimeline } from '../domain/timeline';
+import { tripFor } from '../domain/people';
 import { reminderItems } from '../domain/tripItems';
 import type { PrepKind, StepKind } from '../domain/types';
 import { newId } from '../storage/store';
@@ -46,7 +47,7 @@ export function NotificationActions() {
         await update((d) => setPrep(d, tripId, kind, 'done', newId));
       } else if (tripId && kind) {
         const trip = latest.current.trips.find((t) => t.id === tripId);
-        const step = trip && buildTimeline(trip).find((s) => s.kind === kind);
+        const step = trip && buildTimeline(tripFor(trip, latest.current.meId)).find((s) => s.kind === kind);
         if (trip && step) {
           const stepKind = step.kind;
           const ids = reminderItems(trip, latest.current.items, step, latest.current.owners, latest.current.meId).map((i) => i.id);

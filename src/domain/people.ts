@@ -1,5 +1,5 @@
 import type { AppData } from '../storage/store';
-import type { Item, LocalDate, Person, Trip } from './types';
+import type { FlightLeg, Item, LocalDate, Person, PersonFlights, Trip } from './types';
 
 /**
  * The household's people: who is going on a trip, whose items go on it,
@@ -74,5 +74,35 @@ export function setTravellers(data: AppData, tripId: string, ids: string[]): App
   return {
     ...data,
     trips: data.trips.map((t) => (t.id === tripId ? { ...t, travellerIds: everyone ? undefined : ids } : t)),
+  };
+}
+
+/**
+ * The trip as one person travels it: their own flights where they have
+ * them, the trip's otherwise. Everything else (hotel, items, ticks) is shared.
+ */
+export function tripFor(trip: Trip, personId?: string): Trip {
+  const own = personId ? trip.personFlights?.[personId] : undefined;
+  if (!own) return trip;
+  return { ...trip, flight: own.flight ?? trip.flight, returnFlight: own.returnFlight ?? trip.returnFlight };
+}
+
+const sameLeg = (a?: FlightLeg, b?: FlightLeg) => JSON.stringify(a ?? null) === JSON.stringify(b ?? null);
+
+/** Saves one person's flights. Flights that match the trip's are dropped, so later trip edits reach them. */
+export function setPersonFlights(data: AppData, tripId: string, personId: string, flights: PersonFlights): AppData {
+  return {
+    ...data,
+    trips: data.trips.map((t) => {
+      if (t.id !== tripId) return t;
+      const own: PersonFlights = {
+        ...(!sameLeg(flights.flight, t.flight) && { flight: flights.flight }),
+        ...(!sameLeg(flights.returnFlight, t.returnFlight) && { returnFlight: flights.returnFlight }),
+      };
+      const rest = { ...t.personFlights };
+      delete rest[personId];
+      const personFlights = own.flight || own.returnFlight ? { ...rest, [personId]: own } : rest;
+      return { ...t, personFlights: Object.keys(personFlights).length > 0 ? personFlights : undefined };
+    }),
   };
 }

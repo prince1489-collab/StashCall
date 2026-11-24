@@ -4,7 +4,7 @@ import { useEffect } from 'react';
 import { Alert } from 'react-native';
 
 import { hasTripDetails, type TicketDetails } from '../domain/ticketParse';
-import { isReturnOf } from '../domain/ticketDraft';
+import { isReturnOf, joinsTrip } from '../domain/ticketDraft';
 import { addTickets } from '../domain/tickets';
 import { buildTimeline } from '../domain/timeline';
 import type { Ticket, Trip } from '../domain/types';
@@ -35,7 +35,7 @@ function tripIsOver(trip: Trip): boolean {
  */
 export function ShareInbox() {
   const { hasShareIntent, shareIntent, resetShareIntent } = useShareIntentContext();
-  const { ready, currentTrip, update } = useAppData();
+  const { ready, currentTrip, update, data } = useAppData();
 
   useEffect(() => {
     if (!ready || !hasShareIntent) return;
@@ -84,6 +84,16 @@ export function ShareInbox() {
         return;
       }
 
+      // A household member's own flights for this trip: pick whose, then save
+      // them on the trip instead of starting a new one.
+      if (currentTrip && data.owners.length > 1 && joinsTrip(currentTrip, details)) {
+        router.push({
+          pathname: '/trip/edit',
+          params: { person: 'ask', tickets: JSON.stringify(kept), details: JSON.stringify(details), ...(text && { text }) },
+        });
+        return;
+      }
+
       const keepWithCurrent =
         currentTrip && (hasTripDetails(details) ? sameTrip(currentTrip, details) : !tripIsOver(currentTrip));
       if (!currentTrip || !keepWithCurrent) {
@@ -109,7 +119,7 @@ export function ShareInbox() {
         `Kept with ${currentTrip.name}. It's on the Trip tab, and on Today too.`,
       );
     })();
-  }, [ready, hasShareIntent, shareIntent, resetShareIntent, currentTrip, update]);
+  }, [ready, hasShareIntent, shareIntent, resetShareIntent, currentTrip, update, data.owners.length]);
 
   return null;
 }

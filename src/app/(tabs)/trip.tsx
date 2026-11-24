@@ -1,9 +1,11 @@
 import { Link, router } from 'expo-router';
-import { ScrollView, Share, StyleSheet, Text, View } from 'react-native';
+import { Pressable, ScrollView, Share, StyleSheet, Text, View } from 'react-native';
 
+import { travellers, tripFor } from '../../domain/people';
 import { tripChecklistText } from '../../domain/shareText';
 import { buildTimeline } from '../../domain/timeline';
 import { stepItemNames } from '../../domain/tripItems';
+import type { Trip } from '../../domain/types';
 import { useNow } from '../../hooks/useNow';
 import { useAppData } from '../../state/AppData';
 import { BeforeYouGo } from '../../ui/BeforeYouGo';
@@ -15,7 +17,8 @@ import { Timeline } from '../../ui/Timeline';
 import { colors, fonts, space } from '../../ui/theme';
 
 export default function TripScreen() {
-  const { data, currentTrip, ready } = useAppData();
+  // Shown as this phone's person travels it, with their own flights.
+  const { data, myTrip: currentTrip, currentTrip: sharedTrip, ready } = useAppData();
   const now = useNow();
   if (!ready) return null;
 
@@ -66,6 +69,7 @@ export default function TripScreen() {
           </View>
         </View>
       ) : null}
+      {sharedTrip ? <WhoFlies trip={sharedTrip} /> : null}
       <Text style={styles.note}>
         Estimates are worked out from your flight or checkout time. Tap Edit to change any assumption.
       </Text>
@@ -80,7 +84,49 @@ export default function TripScreen() {
   );
 }
 
+/**
+ * Each traveller's first flight, when people travel differently: Dad flies
+ * from Udaipur and joins the Delhi flight. Tap a person to give them their
+ * own flights.
+ */
+function WhoFlies({ trip }: { trip: Trip }) {
+  const { data } = useAppData();
+  const going = travellers(trip, data.owners);
+  if (going.length < 2 || !trip.flight) return null;
+  return (
+    <View style={styles.who}>
+      <Text style={styles.whoHeading}>Who flies when</Text>
+      {going.map((p) => {
+        const f = tripFor(trip, p.id).flight;
+        const own = !!trip.personFlights?.[p.id]?.flight;
+        return (
+          <Pressable
+            key={p.id}
+            style={styles.whoRow}
+            onPress={() => router.push({ pathname: '/trip/edit', params: { person: p.id } })}
+            accessibilityRole="button"
+            accessibilityHint={`Edit ${p.name}'s flights`}
+          >
+            <Text style={styles.whoName}>{p.name}</Text>
+            <Text style={styles.whoFlight}>
+              {f ? `${f.airport ?? 'Flight'}${f.destination ? ` → ${f.destination}` : ''} · ${formatLocalDate(f.departure)} ${f.departure.slice(11)}` : 'No flight'}
+              {own ? '' : ' · same as trip'}
+            </Text>
+            <Text style={styles.whoEdit}>Edit</Text>
+          </Pressable>
+        );
+      })}
+    </View>
+  );
+}
+
 const styles = StyleSheet.create({
+  who: { backgroundColor: colors.card, borderRadius: 16, borderWidth: StyleSheet.hairlineWidth, borderColor: colors.border, padding: space.l, marginTop: space.m, gap: space.s },
+  whoHeading: { fontSize: 12, fontWeight: '600', letterSpacing: 0.8, textTransform: 'uppercase', color: colors.muted },
+  whoRow: { flexDirection: 'row', alignItems: 'center', gap: space.m, paddingVertical: space.xs },
+  whoName: { fontSize: 15, fontFamily: fonts.bold, color: colors.text, width: 72 },
+  whoFlight: { flex: 1, fontSize: 14, color: colors.text },
+  whoEdit: { fontSize: 14, fontWeight: '700', color: colors.accent },
   container: { padding: space.l, paddingBottom: 48 },
   header: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' },
   title: { fontSize: 26, fontFamily: fonts.display, color: colors.text, flex: 1 },
