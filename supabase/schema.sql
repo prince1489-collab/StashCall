@@ -89,6 +89,13 @@ begin
   return h;
 end $$;
 
+-- Signed-in phones reach the tables through the API; the policies above
+-- decide which rows. (Needed when "Grant API access to new tables" was off.)
+grant usage on schema public to authenticated;
+grant select, delete on public.members to authenticated;
+grant select on public.households to authenticated;
+grant select, insert, update, delete on public.records to authenticated;
+
 grant execute on function public.create_household() to authenticated;
 grant execute on function public.join_household(text) to authenticated;
 
