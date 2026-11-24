@@ -46,6 +46,7 @@ export default function RootLayout() {
             <Stack.Screen name="trip/edit" options={{ presentation: 'modal', title: 'Trip' }} />
             <Stack.Screen name="item/edit" options={{ presentation: 'modal', title: 'Item' }} />
             <Stack.Screen name="settings" options={{ title: 'Settings' }} />
+            <Stack.Screen name="people" options={{ title: 'People' }} />
           </Stack>
         </RemindersProvider>
       </AppDataProvider>

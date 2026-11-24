@@ -15,10 +15,23 @@ export type LocalTime = string;
 /** When an item needs remembering. */
 export type ItemMoment = 'home' | 'checkout' | 'both';
 
+/**
+ * A person in the household. Items can belong to them, trips list who is
+ * going, and each has their own passport date.
+ */
 export interface Owner {
   id: string;
   name: string;
+  /** Children don't get their own reminders; an adult's phone covers them. */
+  child?: boolean;
+  /** When this person's passport runs out, if known. */
+  passportExpires?: LocalDate;
+  /** True once they use StashCall on their own phone, so others' phones stop covering their items. */
+  ownPhone?: boolean;
 }
+
+/** Friendlier name for the same thing: the household's people. */
+export type Person = Owner;
 
 export interface Item {
   id: string;
@@ -83,6 +96,8 @@ export interface Trip {
   checkout?: HotelCheckout;
   /** The flight home, planned from the hotel rather than from home. */
   returnFlight?: FlightLeg;
+  /** Who is going, as person ids. Unset means everyone in the household. */
+  travellerIds?: string[];
   /** Items chosen for this trip (ids into the household item list). */
   itemIds: string[];
   /** Screenshots of tickets, boarding passes or bookings, kept on the phone. */

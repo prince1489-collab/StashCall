@@ -74,10 +74,10 @@ export default function Today() {
   const steps = buildTimeline(currentTrip);
   const upcoming = steps.filter((s) => s.at.getTime() >= now.getTime());
   const open = openChecklistStep(steps, now);
-  const openItems = open ? stepItems(currentTrip, data.items, open) : [];
+  const openItems = open ? stepItems(currentTrip, data.items, open, data.owners) : [];
   const trip = currentTrip;
   const next = upcoming[0];
-  const nextNames = next ? stepItemNames(currentTrip, data.items, next) : [];
+  const nextNames = next ? stepItemNames(currentTrip, data.items, next, data.owners) : [];
 
   return (
     <ScrollView contentContainerStyle={styles.container}>
@@ -136,7 +136,7 @@ export default function Today() {
       {upcoming.length > 1 ? (
         <>
           <Text style={styles.section}>Coming up</Text>
-          <Timeline steps={upcoming.slice(1, 5)} itemsFor={(s) => stepItemNames(currentTrip, data.items, s)} now={now} />
+          <Timeline steps={upcoming.slice(1, 5)} itemsFor={(s) => stepItemNames(currentTrip, data.items, s, data.owners)} now={now} />
         </>
       ) : null}
       <Text style={styles.footerLink} onPress={sendFeedback} accessibilityRole="button">
