@@ -62,6 +62,14 @@ describe('family sharing records', () => {
     expect(changesToPush(r.data, r.state).map((x) => x.id)).toEqual(['t1']);
   });
 
+  it('ignores rows it already has, so an idle phone stays idle', () => {
+    const sent = changesToPush(mine, {});
+    const state = markPushed({}, sent);
+    const r = applyRemote(mine, state, asRows(sent));
+    expect(r.changed).toBe(false);
+    expect(r.data).toBe(mine);
+  });
+
   it('shares deletions both ways', () => {
     const state = markPushed({}, changesToPush(mine, {}));
     const noItem = { ...mine, items: [] };

@@ -92,12 +92,15 @@ export function markPushed(state: SyncState, rows: Pick<SyncRow, 'kind' | 'id' |
  * Applies rows from the server. A row is skipped when this phone has an
  * unsent change to the same record; that change is pushed next and wins.
  */
-export function applyRemote(data: AppData, state: SyncState, rows: SyncRow[]): { data: AppData; state: SyncState } {
+export function applyRemote(data: AppData, state: SyncState, rows: SyncRow[]): { data: AppData; state: SyncState; changed: boolean } {
   const local = localRecords(data);
   let next = data;
   const nextState = { ...state };
+  let changed = false;
   for (const row of rows) {
     const key = keyOf(row.kind, row.id);
+    // Already applied (pulls overlap a little): nothing to do.
+    if (state[key] === (row.deleted ? DELETED : fingerprint(row.data))) continue;
     const mine = local.get(key);
     const known = key in state;
     // Changed here since we last agreed with the server, and not sent yet.
@@ -108,8 +111,9 @@ export function applyRemote(data: AppData, state: SyncState, rows: SyncRow[]): {
     if (changedHere || deletedHere) continue;
     next = row.deleted ? remove(next, row.kind, row.id) : put(next, row.kind, row.id, row.data);
     nextState[key] = row.deleted ? DELETED : fingerprint(row.data);
+    changed = true;
   }
-  return { data: next, state: nextState };
+  return { data: changed ? next : data, state: nextState, changed };
 }
 
 function remove(data: AppData, kind: RecordKind, id: string): AppData {

@@ -50,6 +50,8 @@ export function SyncProvider({ children }: { children: ReactNode }) {
   // One sync at a time; a request during a run asks for one more run.
   const running = useRef<Promise<void> | null>(null);
   const again = useRef(false);
+  // Bumped on leave: a run that started before must not apply or send anything after it.
+  const epoch = useRef(0);
 
   const save = useCallback(async (next: Stored) => {
     storedRef.current = next;
@@ -73,6 +75,8 @@ export function SyncProvider({ children }: { children: ReactNode }) {
     const sb = supabase();
     const s = storedRef.current;
     if (!sb || !s.householdId) return;
+    const started = epoch.current;
+    const stillHere = () => epoch.current === started && storedRef.current.householdId === s.householdId;
     setStatus('syncing');
     try {
       await ensureSignedIn(sb);
@@ -81,17 +85,26 @@ export function SyncProvider({ children }: { children: ReactNode }) {
       if (s.lastPull) query = query.gte('updated_at', new Date(Date.parse(s.lastPull) - 60_000).toISOString());
       const { data: rows, error } = await query.order('updated_at');
       if (error) throw error;
+      if (!stillHere()) return;
       let state = s.state;
       if (rows && rows.length > 0) {
-        await update((d) => {
-          const r = applyRemote(d, state, rows as SyncRow[]);
-          state = r.state;
-          return r.data;
-        });
+        const preview = applyRemote(dataRef.current, state, rows as SyncRow[]);
+        // Only touch the app's data when something actually changed, or an idle
+        // phone would keep re-saving and re-syncing the same rows.
+        if (preview.changed) {
+          await update((d) => {
+            const r = applyRemote(d, state, rows as SyncRow[]);
+            state = r.state;
+            return r.data;
+          });
+        } else {
+          state = preview.state;
+        }
       }
       const lastPull = rows && rows.length > 0 ? (rows[rows.length - 1] as SyncRow).updated_at : s.lastPull;
 
       const outgoing = changesToPush(dataRef.current, state);
+      if (!stillHere()) return;
       if (outgoing.length > 0) {
         const { error: pushError } = await sb
           .from('records')
@@ -99,6 +112,7 @@ export function SyncProvider({ children }: { children: ReactNode }) {
         if (pushError) throw pushError;
         state = markPushed(state, outgoing);
       }
+      if (!stillHere()) return;
       await save({ ...storedRef.current, state, lastPull });
       setStatus('synced');
     } catch {
@@ -167,16 +181,20 @@ export function SyncProvider({ children }: { children: ReactNode }) {
       const { data: id, error } = await sb.rpc('join_household', { code });
       if (error) throw error;
       if (!id) return false;
+      // Who this phone belongs to is chosen from the household's people, not
+      // from anyone made here before joining.
+      await update((d) => ({ ...d, meId: undefined }));
       await save({ householdId: id as string, inviteCode: code.trim().toUpperCase(), state: {} });
       await syncNow();
       return true;
     },
-    [save, syncNow],
+    [save, syncNow, update],
   );
 
   const leave = useCallback(async () => {
     const sb = supabase();
     const id = storedRef.current.householdId;
+    epoch.current += 1;
     await save(EMPTY);
     setStatus(SHARING_SET_UP ? 'off' : 'not-set-up');
     if (sb && id) {
