@@ -472,12 +472,12 @@ export default function EditTrip() {
           </View>
         ) : (
           <Text style={styles.fillLink} onPress={fillFromScreenshot} accessibilityRole="button">
-            Fill in from ticket screenshots
+            Add screenshots
           </Text>
         )}
         <Text style={styles.fillHint}>
           {readNote ??
-            'Pick every booking for the trip at once: flights, boarding passes, hotel. StashCall reads them on your phone, sorts the flights into the way there and the way home, and keeps them with the trip.'}
+            'Add your bookings one at a time or all at once. StashCall reads them on your phone, works out the way there and the way home, connections included, and keeps them with the trip for everyone on it.'}
         </Text>
         {joined.flight || joined.returnFlight ? (
           <Text style={styles.textLink} onPress={keepOnlyRead} accessibilityRole="button">
