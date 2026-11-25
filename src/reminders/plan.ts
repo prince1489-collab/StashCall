@@ -76,6 +76,12 @@ function textFor(step: TimelineStep, steps: TimelineStep[], items: string[]): { 
         title: 'Last check of the room',
         body: list ? `Have you got: ${list}?` : 'Check drawers, sockets, the safe and the bathroom.',
       };
+    case 'connection':
+    case 'returnConnection':
+      return {
+        title: `Next flight at ${step.localTime}`,
+        body: step.detail ? `${step.detail}. Head to the gate in good time.` : 'Head to the gate for your next flight in good time.',
+      };
     case 'returnLeave': {
       const takeoff = find('returnTakeoff');
       return {
@@ -142,14 +148,15 @@ export function planReminders(trip: Trip, items: Item[], now: Date, people: Pers
   };
   const steps = buildTimeline(trip);
   const timeline = steps
-    .filter((s) => s.notify && s.at.getTime() > now.getTime())
+    .filter((s) => s.notify && (s.remindAt ?? s.at).getTime() > now.getTime())
     .map((s): PlannedReminder | null => {
       const names = reminderItems(trip, items, s, people, meId).map(label);
       const text = textFor(s, steps, names);
       if (!text) return null;
       return {
-        id: `${trip.id}:${s.kind}`,
-        at: s.at,
+        // Several connections each get their own reminder.
+        id: s.kind === 'connection' || s.kind === 'returnConnection' ? `${trip.id}:${s.kind}:${s.at.getTime()}` : `${trip.id}:${s.kind}`,
+        at: s.remindAt ?? s.at,
         ...text,
         kind: s.kind,
         critical: ['wake', 'leave', 'returnWake', 'returnLeave'].includes(s.kind),

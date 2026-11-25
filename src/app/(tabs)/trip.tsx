@@ -88,6 +88,14 @@ export default function TripScreen() {
   );
 }
 
+/** "UDR → DEL → PGH": every stop on the way, connections included. */
+function route(f: NonNullable<Trip['flight']>): string {
+  const stops = [f.airport ?? 'Flight', ...(f.connections ?? []).map((c) => c.airport), f.destination].filter(
+    (x, i, all): x is string => !!x && x !== all[i - 1],
+  );
+  return stops.join(' → ');
+}
+
 /** Every trip, next first, then the ones that are over. Tap one to open it. */
 function TripPicker() {
   const { data, currentTrip, viewTrip } = useAppData();
@@ -162,7 +170,7 @@ function WhoFlies({ trip }: { trip: Trip }) {
           >
             <Text style={styles.whoName}>{p.name}</Text>
             <Text style={styles.whoFlight}>
-              {f ? `${f.airport ?? 'Flight'}${f.destination ? ` → ${f.destination}` : ''} · ${formatLocalDate(f.departure)} ${f.departure.slice(11)}` : 'No flight'}
+              {f ? `${route(f)} · ${formatLocalDate(f.departure)} ${f.departure.slice(11)}` : 'No flight'}
               {own ? '' : ' · same as trip'}
             </Text>
             <Text style={styles.whoEdit}>Edit</Text>

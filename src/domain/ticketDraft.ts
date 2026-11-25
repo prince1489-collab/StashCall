@@ -2,7 +2,7 @@ import { DEFAULTS } from './defaults';
 import { suggestTripName, type FlightDetails, type TicketDetails } from './ticketParse';
 import { zonedToInstant } from './time';
 import { defaultFlight } from './timeline';
-import type { FlightLeg, HotelCheckout, Trip } from './types';
+import type { Connection, FlightLeg, HotelCheckout, Trip } from './types';
 
 export interface TripDraft {
   name: string;
@@ -36,13 +36,33 @@ export function draftFromTicket(d: TicketDetails, fallbackZone: string): TripDra
  * A flight from what was read. Its zone is the departure airport's when we
  * know the airport (then it counts as confirmed), else `fallbackZone`.
  */
-export function flightLeg(f: FlightDetails, fallbackZone: string, fallbackConfirmed = false): FlightLeg {
+export function flightLeg(
+  f: FlightDetails & { connections?: FlightDetails[] },
+  fallbackZone: string,
+  fallbackConfirmed = false,
+): FlightLeg {
   const international = f.from && f.to ? f.from.country !== f.to.country : true;
+  const zone = f.from?.timeZone ?? fallbackZone;
+  const connections = (f.connections ?? [])
+    .filter((c) => c.departure)
+    .map(
+      (c): Connection => ({
+        departure: c.departure!,
+        timeZone: c.from?.timeZone ?? zone,
+        ...(c.flightNumber && { flightNumber: c.flightNumber }),
+        ...(c.from && { airport: c.from.code }),
+        ...(c.to && { destination: c.to.code }),
+        ...(c.terminal && { terminal: c.terminal }),
+      }),
+    );
   return {
-    ...defaultFlight(f.departure!, f.from?.timeZone ?? fallbackZone, international),
+    ...defaultFlight(f.departure!, zone, international),
     airport: f.from?.code,
     destination: f.to?.code,
     timeZoneConfirmed: f.from ? true : fallbackConfirmed,
+    ...(f.flightNumber && { flightNumber: f.flightNumber }),
+    ...(f.terminal && { terminal: f.terminal }),
+    ...(connections.length > 0 && { connections }),
   };
 }
 
@@ -71,14 +91,41 @@ export function joinsTrip(trip: Trip, d: TicketDetails): boolean {
   return Math.abs(day(d.departure) - day(f.departure)) <= 86400000;
 }
 
+const instant = (f: { departure: string; timeZone: string }) => zonedToInstant(f.departure, f.timeZone).getTime();
+
+/** A flight as a connection of another. */
+function asConnection(f: FlightLeg | Connection): Connection {
+  return {
+    departure: f.departure,
+    timeZone: f.timeZone,
+    ...(f.flightNumber && { flightNumber: f.flightNumber }),
+    ...(f.airport && { airport: f.airport }),
+    ...(f.destination && { destination: f.destination }),
+    ...(f.terminal && { terminal: f.terminal }),
+  };
+}
+
 /**
  * Two bookings for one journey, like Udaipur → Delhi and Delhi → Pantnagar
- * on the same day: the day is planned from the first flight, so keep the
- * earlier leg. Legs more than a day apart aren't one journey: the new one wins.
+ * on the same day, become one: the day is planned from the first flight, and
+ * the later ones are its connections. Flights more than a day apart aren't
+ * one journey: the new one replaces the old.
  */
-export function firstLegOfDay(had: FlightLeg | null | undefined, read: FlightLeg): FlightLeg {
-  if (!had) return read;
-  const a = zonedToInstant(had.departure, had.timeZone).getTime();
-  const b = zonedToInstant(read.departure, read.timeZone).getTime();
-  return Math.abs(a - b) <= 24 * 3600 * 1000 && a < b ? had : read;
+export function joinLegs(had: FlightLeg | null | undefined, read: FlightLeg): FlightLeg {
+  if (!had || Math.abs(instant(had) - instant(read)) > 24 * 3600 * 1000) return read;
+  const [first, second] = instant(had) <= instant(read) ? [had, read] : [read, had];
+  const all = [...(first.connections ?? []), asConnection(second), ...(second.connections ?? [])];
+  // The same flight in both bookings counts once.
+  const seen = new Set<number>([instant(first)]);
+  const connections = all
+    .filter((c) => (seen.has(instant(c)) ? false : (seen.add(instant(c)), true)))
+    .sort((a, b) => instant(a) - instant(b));
+  const last = connections[connections.length - 1];
+  return {
+    ...first,
+    destination: last?.destination ?? first.destination,
+    // Abroad if any flight on the way is.
+    international: first.international || second.international,
+    ...(connections.length > 0 && { connections }),
+  };
 }

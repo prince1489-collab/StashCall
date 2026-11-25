@@ -1,6 +1,10 @@
 import { DEFAULTS } from './defaults';
 import { addMinutes, dayBefore, timeLabel, zonedToInstant } from './time';
-import type { FlightLeg, HotelCheckout, StepKind, TimelineStep, Trip } from './types';
+import { AIRPORTS } from './airports';
+import type { Connection, FlightLeg, HotelCheckout, StepKind, TimelineStep, Trip } from './types';
+
+/** How long before a connecting flight its reminder goes off: time to find the gate, or change terminal. */
+const CONNECTION_REMIND_MINUTES = 90;
 
 /**
  * Builds the travel-day timeline by working backwards from the fixed points
@@ -23,7 +27,7 @@ function step(
   title: string,
   at: Date,
   timeZone: string,
-  opts: Partial<Pick<TimelineStep, 'estimate' | 'notify' | 'itemMoment'>> = {},
+  opts: Partial<Pick<TimelineStep, 'estimate' | 'notify' | 'itemMoment' | 'remindAt' | 'detail'>> = {},
 ): TimelineStep {
   return {
     kind,
@@ -34,7 +38,27 @@ function step(
     estimate: opts.estimate ?? true,
     notify: opts.notify ?? false,
     itemMoment: opts.itemMoment,
+    ...(opts.remindAt && { remindAt: opts.remindAt }),
+    ...(opts.detail && { detail: opts.detail }),
   };
+}
+
+/** "6E7415 to Pantnagar from T1". */
+export function connectionDetail(c: Connection): string {
+  const to = c.destination ? (AIRPORTS[c.destination]?.city ?? c.destination) : undefined;
+  return [c.flightNumber, to && `to ${to}`, c.terminal && `from ${c.terminal}`].filter(Boolean).join(' ');
+}
+
+function connectionSteps(f: FlightLeg): TimelineStep[] {
+  return (f.connections ?? []).map((c) => {
+    const at = zonedToInstant(c.departure, c.timeZone);
+    return step('connection', 'Next flight departs', at, c.timeZone, {
+      estimate: false,
+      notify: true,
+      remindAt: addMinutes(at, -CONNECTION_REMIND_MINUTES),
+      detail: connectionDetail(c) || undefined,
+    });
+  });
 }
 
 export function flightSteps(f: FlightLeg): TimelineStep[] {
@@ -58,7 +82,8 @@ export function flightSteps(f: FlightLeg): TimelineStep[] {
     }),
     step('leave', 'Leave home', leave, tz, { notify: true }),
     step('airport', 'Arrive at the airport', airport, tz),
-    step('takeoff', 'Flight departs', takeoff, tz, { estimate: false }),
+    step('takeoff', 'Flight departs', takeoff, tz, { estimate: false, detail: f.flightNumber && [f.flightNumber, f.terminal && `from ${f.terminal}`].filter(Boolean).join(' ') }),
+    ...connectionSteps(f),
   ];
 }
 
@@ -74,6 +99,7 @@ export function returnFlightSteps(f: FlightLeg): TimelineStep[] {
     leave: { kind: 'returnLeave', title: 'Leave for the airport' },
     airport: { kind: 'returnAirport', title: 'Arrive at the airport' },
     takeoff: { kind: 'returnTakeoff', title: 'Flight home departs' },
+    connection: { kind: 'returnConnection', title: 'Next flight home departs' },
   };
   return flightSteps(f).map((s) => ({
     ...s,
