@@ -284,6 +284,15 @@ describe('IndiGo tables read column by column', () => {
     expect(d.returnFlight?.to?.code).toBe('DEL');
     expect(d.returnFlight?.terminal).toBeUndefined();
   });
+
+  it('leaves other layouts to the row reader', () => {
+    const d = parseTicketText(
+      ['Departure', '5 Feb 2027', 'LHR 09:40', 'Arrival', '5 Feb 2027', 'BOM 23:50', 'BA137', 'BA138', 'Departure', '19 Feb 2027', 'BOM 02:15', 'Arrival', '19 Feb 2027', 'LHR 07:05'],
+      new Date('2026-11-25T04:00:00Z'),
+    );
+    expect(d.departure).toBe('2027-02-05T09:40');
+    expect(d.returnFlight?.departure).toBe('2027-02-19T02:15');
+  });
 });
 
 describe('Yatra e-tickets', () => {
