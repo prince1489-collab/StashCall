@@ -32,7 +32,7 @@ export default function TripScreen() {
         <Text style={styles.emptyText}>
           Add your flight time or hotel checkout. StashCall works out the rest.
         </Text>
-        <PrimaryButton label="Add a trip" onPress={() => router.push('/trip/edit')} />
+        <PrimaryButton label="Add a trip" onPress={() => router.push({ pathname: '/trip/edit', params: { new: '1' } })} />
       </View>
     );
   }
@@ -70,7 +70,8 @@ function TripList() {
   const mine = (t: Trip) => tripFor(t, data.meId);
   // Trips this person isn't going on fold away below.
   const own = data.trips.filter((t) => isGoing(t, data.meId));
-  const others = upcomingTrips(data.trips.filter((t) => !isGoing(t, data.meId)), now);
+  const notMine = data.trips.filter((t) => !isGoing(t, data.meId));
+  const others = [...upcomingTrips(notMine, now), ...pastTrips(notMine, now)];
   const byId = new Map(data.trips.map((t) => [t.id, t]));
   const coming = upcomingTrips(own.map(mine), now).map((t) => byId.get(t.id)!);
   const over = pastTrips(own.map(mine), now).map((t) => byId.get(t.id)!);
