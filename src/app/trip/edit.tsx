@@ -9,6 +9,8 @@ import { addTickets } from '../../domain/tickets';
 import { draftFromTicket, joinLegs, flightLeg, isReturnOf } from '../../domain/ticketDraft';
 import { describeTicket, hasTripDetails, type TicketDetails } from '../../domain/ticketParse';
 import { buildTimeline, defaultFlight } from '../../domain/timeline';
+import { autoTripName, isAutoName } from '../../domain/trips';
+import { AIRPORTS } from '../../domain/airports';
 import type { FlightLeg, HotelCheckout, Ticket, Trip } from '../../domain/types';
 import { deletePhoto, pickTicket } from '../../storage/photos';
 import { newId } from '../../storage/store';
@@ -66,6 +68,8 @@ function newCheckout(): HotelCheckout {
   };
 }
 
+const cityOf = (code: string) => AIRPORTS[code]?.city;
+
 export default function EditTrip() {
   const { data, currentTrip, saveTrip, deleteTrip, update } = useAppData();
   const { askPermission } = useReminders();
@@ -79,6 +83,14 @@ export default function EditTrip() {
   const existing = params.new === '1' ? undefined : personMode ? tripFor(currentTrip!, personId) : currentTrip;
 
   const [name, setName] = useState(existing?.name ?? '');
+  // A name StashCall made up follows the journey: add the Delhi → Pantnagar
+  // leg and "Delhi in December" becomes "Pantnagar in December". A name the
+  // user typed stays.
+  const nameTouched = useRef(!!existing && !isAutoName(existing.name, existing.flight, cityOf));
+  const typeName = (n: string) => {
+    nameTouched.current = true;
+    setName(n);
+  };
   const [hasFlight, setHasFlight] = useState(existing ? !!existing.flight : true);
   const [flight, setFlight] = useState<FlightLeg>(
     existing?.flight ?? defaultFlight(localDaysFromNow(7, 10), deviceZone(), true),
@@ -188,6 +200,12 @@ export default function EditTrip() {
     }
     setReadNote(`Filled in from your screenshot: ${describeTicket(d, formatLocalDate)}. Check the times before saving.`);
   };
+
+  useEffect(() => {
+    if (personMode || nameTouched.current || !hasFlight) return;
+    const auto = autoTripName(flight, cityOf);
+    if (auto) setName(auto);
+  }, [personMode, hasFlight, flight]);
 
   // Picking someone else shows their flights, except a leg read from the
   // screenshot, which is what the user is assigning to them.
@@ -413,7 +431,7 @@ export default function EditTrip() {
       <Section title="Trip name">
         <TextInput
           value={name}
-          onChangeText={setName}
+          onChangeText={typeName}
           placeholder="Milan in December"
           placeholderTextColor={colors.muted}
           style={[styles.input, styles.name]}

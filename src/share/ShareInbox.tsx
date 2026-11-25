@@ -35,7 +35,7 @@ function tripIsOver(trip: Trip): boolean {
  */
 export function ShareInbox() {
   const { hasShareIntent, shareIntent, resetShareIntent } = useShareIntentContext();
-  const { ready, currentTrip, update, data } = useAppData();
+  const { ready, currentTrip, update, data, viewTrip } = useAppData();
 
   useEffect(() => {
     if (!ready || !hasShareIntent) return;
@@ -113,6 +113,7 @@ export function ShareInbox() {
       }
 
       await update((d) => addTickets(d, currentTrip.id, kept));
+      viewTrip(currentTrip.id);
       router.navigate('/trip');
       Alert.alert(
         kept.length === 1 ? 'Ticket saved' : `${kept.length} tickets saved`,
