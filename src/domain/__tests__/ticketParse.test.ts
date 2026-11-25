@@ -213,3 +213,75 @@ describe('connecting flights', () => {
     expect(d.returnFlight).toBeUndefined();
   });
 });
+
+describe('IndiGo booking tables', () => {
+  // What on-device OCR reads from Bajrang's IndiGo email: each flight is a
+  // table row with the date, city and time before the flight number, and
+  // the booking time at the top.
+  const delhiPantnagar = [
+    'IndiGo', 'PNR/Booking Ref.: S8HDWI',
+    'Status Date of Booking* Payment Status', 'CONFIRMED 30 Oct 26 11:12:20 (UTC) Approved',
+    '*Booking Date reflects in UTC (Universal Time Coordinated), all other timings mentioned are as per Local Time.',
+    'IndiGo Passenger - 1/2', 'Check-in now', 'Flight Status', 'IndiGo Flight(s)', 'Mr. Bajrang singh Rathore',
+    'Date', 'From (Terminal)', 'Departs', 'Flight Number (Aircraft type)', 'Check-in/Bag drop closes', 'To (Terminal)', 'Arrives', 'Via',
+    '06 Dec 26', 'Delhi (T1)', '12:00', '6E7415 (ATR)', '11:00', 'Pantnagar', '13:00',
+    'IndiGo Flight(s)', 'Mr. Bajrang singh Rathore',
+    'Date', 'From (Terminal)', 'Departs', 'Flight Number (Aircraft type)', 'Check-in/Bag drop closes', 'To (Terminal)', 'Arrives', 'Via',
+    '08 Dec 26', 'Pantnagar', '13:20', '6E7414 (ATR)', '12:20', 'Delhi (T1)', '14:15',
+    'Seats and Additional Services', 'DEL → PGH', 'PGH → DEL', 'Passenger name Seat Services Purchased',
+    'Mr. Bajrang singh Rathore 6A AGAI, Express Check In,VCSW',
+  ];
+  const now = new Date('2026-11-25T04:00:00Z');
+
+  it('reads the flights, not the booking time', () => {
+    const d = parseTicketText(delhiPantnagar, now);
+    expect(d.departure).toBe('2026-12-06T12:00');
+    expect(d.flightNumber).toBe('6E7415');
+    expect(d.from?.code).toBe('DEL');
+    expect(d.to?.code).toBe('PGH');
+    expect(d.returnFlight?.departure).toBe('2026-12-08T13:20');
+    expect(d.returnFlight?.flightNumber).toBe('6E7414');
+    expect(d.returnFlight?.from?.code).toBe('PGH');
+    expect(suggestTripName(d)).toBe('Pantnagar in December');
+  });
+
+  it('reads Udaipur to Delhi and back', () => {
+    const d = parseTicketText(
+      [
+        'IndiGo', 'PNR/Booking Ref.: V9VH6P', 'CONFIRMED', '28 Oct 26 12:03:19 (UTC)', 'Approved',
+        'IndiGo Flight(s)', 'Date', 'From (Terminal)', 'Departs', 'Flight Number (Aircraft type)', 'Check-in/Bag drop closes', 'To (Terminal)', 'Arrives',
+        '06 Dec 26', 'Udaipur', '08:55', '6E2008 (A321)', '07:55', 'Delhi (T2)', '10:20',
+        'IndiGo Flight(s)', 'Date', 'From (Terminal)', 'Departs', 'Flight Number (Aircraft type)', 'Check-in/Bag drop closes', 'To (Terminal)', 'Arrives',
+        '08 Dec 26', 'Delhi (T1)', '18:00', '6E6228 (A321)', '17:00', 'Udaipur', '19:20',
+      ],
+      now,
+    );
+    expect(d.departure).toBe('2026-12-06T08:55');
+    expect(d.from?.code).toBe('UDR');
+    expect(d.to?.code).toBe('DEL');
+    expect(d.returnFlight?.departure).toBe('2026-12-08T18:00');
+  });
+});
+
+describe('two bookings for one journey', () => {
+  it('keeps the first flight of the day each way', async () => {
+    const { firstLegOfDay } = await import('../ticketDraft');
+    const { defaultFlight } = await import('../timeline');
+    const udaipur = defaultFlight('2026-12-06T08:55', 'Asia/Kolkata', false);
+    const delhi = defaultFlight('2026-12-06T12:00', 'Asia/Kolkata', false);
+    expect(firstLegOfDay(udaipur, delhi)).toBe(udaipur);
+    expect(firstLegOfDay(delhi, udaipur)).toBe(udaipur);
+    expect(firstLegOfDay(undefined, delhi)).toBe(delhi);
+    // A different trip altogether: the new flight replaces it.
+    const later = defaultFlight('2027-02-10T09:00', 'Asia/Kolkata', true);
+    expect(firstLegOfDay(udaipur, later)).toBe(later);
+  });
+});
+
+describe('cities and codes', () => {
+  it('keeps the airport code a ticket gives for a city', () => {
+    const d = parseTicketText(['London (LGW) to Paris (ORY)', 'Flight AF1234', '5 Feb 2027', 'Departs 09:40'], today);
+    expect(d.from?.code).toBe('LGW');
+    expect(d.to?.code).toBe('ORY');
+  });
+});

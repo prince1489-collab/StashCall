@@ -128,13 +128,44 @@ function findFlightNumber(text: string): string | undefined {
   return best ? `${best[1]}${best[2]}` : undefined;
 }
 
+/** The first airport listed for each city: "Delhi" → DEL. */
+const BY_CITY = new Map<string, Airport>();
+for (const a of Object.values(AIRPORTS)) if (!BY_CITY.has(a.city.toLowerCase())) BY_CITY.set(a.city.toLowerCase(), a);
+const CITY = new RegExp(`\\b(${[...BY_CITY.keys()].map((c) => c.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')).join('|')})\\b`, 'gi');
+
+/**
+ * Airports in the order they appear, by code ("DEL") or, when a booking
+ * only names cities ("Delhi (T1)" on IndiGo), by city.
+ */
 function findAirports(text: string): Airport[] {
-  const seen: Airport[] = [];
+  const hits: { index: number; airport: Airport }[] = [];
   for (const m of text.matchAll(/\b([A-Z]{3})\b/g)) {
     const a = AIRPORTS[m[1]];
-    if (a && !seen.some((s) => s.code === a.code)) seen.push(a);
+    if (a) hits.push({ index: m.index, airport: a });
+  }
+  // A city named alongside its code is that airport: "London (LGW)" is Gatwick, not Heathrow.
+  const coded = new Map<string, Airport>();
+  for (const h of hits) if (!coded.has(h.airport.city)) coded.set(h.airport.city, h.airport);
+  for (const m of text.matchAll(CITY)) {
+    const a = BY_CITY.get(m[1].toLowerCase());
+    if (a) hits.push({ index: m.index, airport: coded.get(a.city) ?? a });
+  }
+  hits.sort((a, b) => a.index - b.index);
+  const seen: Airport[] = [];
+  for (const { airport } of hits) {
+    if (!seen.some((s) => s.code === airport.code)) seen.push(airport);
   }
   return seen;
+}
+
+/**
+ * When the booking was made, not when anyone flies: "30 Oct 26 11:12:20
+ * (UTC)". Times with seconds are always timestamps like this one.
+ */
+function dropTimestamps(text: string): string {
+  return text
+    .replace(new RegExp(`\\b\\d{1,2}[\\s\\-]*${MONTH}[\\s,\\-]*\\d{2,4}\\s+\\d{1,2}:\\d{2}:\\d{2}(?:\\s*\\(UTC\\))?`, 'gi'), ' ')
+    .replace(/\b\d{1,2}:\d{2}:\d{2}\b(?:\s*\(UTC\))?/g, ' ');
 }
 
 function findCheckout(text: string, today: Date): LocalDateTime | undefined {
@@ -153,7 +184,7 @@ function findCheckout(text: string, today: Date): LocalDateTime | undefined {
  * Text comes from on-device OCR, so lines may be out of order or split.
  */
 export function parseTicketText(blocks: string[], today: Date = new Date()): TicketDetails {
-  const text = fixOcrDigits(blocks.join('\n'));
+  const text = dropTimestamps(fixOcrDigits(blocks.join('\n')));
   const flightText = text.replace(/check[\s-]?out[\s\S]*$/i, '');
 
   // A booking with an outbound and a return flight lists two flight numbers.
@@ -213,7 +244,11 @@ function splitByFlight(text: string): string[] {
     starts.push(m.index);
   }
   if (starts.length < 2) return [text];
-  return starts.map((start, i) => text.slice(i === 0 ? 0 : start, starts[i + 1] ?? text.length));
+  // Tables like IndiGo's put each flight's date, airport and time before its
+  // flight number: then split at the dates instead, one per flight.
+  const dates = findDates(text);
+  const cuts = dates.length === starts.length && dates[0].index < starts[0] ? dates.map((d) => d.index) : starts;
+  return cuts.map((start, i) => text.slice(i === 0 ? 0 : start, cuts[i + 1] ?? text.length));
 }
 
 function parseFlight(flightText: string, today: Date): FlightDetails {
