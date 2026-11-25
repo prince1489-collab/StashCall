@@ -242,6 +242,9 @@ describe('IndiGo booking tables', () => {
     expect(d.returnFlight?.departure).toBe('2026-12-08T13:20');
     expect(d.returnFlight?.flightNumber).toBe('6E7414');
     expect(d.returnFlight?.from?.code).toBe('PGH');
+    // T1 is where it lands in Delhi, not where it leaves Pantnagar.
+    expect(d.terminal).toBe('T1');
+    expect(d.returnFlight?.terminal).toBeUndefined();
     expect(suggestTripName(d)).toBe('Pantnagar in December');
   });
 
@@ -260,6 +263,25 @@ describe('IndiGo booking tables', () => {
     expect(d.from?.code).toBe('UDR');
     expect(d.to?.code).toBe('DEL');
     expect(d.returnFlight?.departure).toBe('2026-12-08T18:00');
+  });
+});
+
+describe('Yatra e-tickets', () => {
+  it('reads the flight and its departure terminal', () => {
+    const d = parseTicketText(
+      [
+        'E-Ticket booked with', 'yatra', 'Booking Confirmed', 'Booking ID: 441179544014542062933',
+        'Booked on: Mon, 23 Nov 2026 18:52:26', 'Departure Flight', 'New Delhi to Mumbai | Tue, 08 Dec 2026', 'PNR Number : DC9JFW',
+        '17:45 | FLEXI PLUS', 'IndiGo 6E - 328', 'New Delhi DEL', 'Tue, 08 Dec 2026 17:45', 'Indira Gandhi Airport', 'Terminal: T-1',
+        '— 2h 25m —', 'Economy', 'BOM Mumbai', 'Tue, 08 Dec 2026', '20:10', 'Chatrapati Shivaji Airport', 'Terminal: T-2',
+        'Mr. Mahiman singh Rathore (ADT)', 'DEL-BOM',
+      ],
+      new Date('2026-11-25T04:00:00Z'),
+    );
+    expect(d.departure).toBe('2026-12-08T17:45');
+    expect(d.from?.code).toBe('DEL');
+    expect(d.to?.code).toBe('BOM');
+    expect(d.terminal).toBe('T1');
   });
 });
 

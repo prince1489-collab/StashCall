@@ -292,9 +292,15 @@ function parseFlight(flightText: string, today: Date): FlightDetails {
   }
   if (details.departure) {
     details.flightNumber = findFlightNumber(flightText);
-    // The first terminal named is where it leaves from: "Delhi (T1)", "Terminal 5".
-    const t = /\(T\s?(\d)\)|\bTerminal\s+(\d)\b/i.exec(flightText);
-    if (t) details.terminal = `T${t[1] ?? t[2]}`;
+    // The first terminal named is where it leaves from: "Delhi (T1)",
+    // "Terminal 5", "Terminal: T-2". Not one at the destination, as in
+    // "Pantnagar 13:20 … Delhi (T1)".
+    const toCity = details.to?.city.toLowerCase();
+    for (const t of flightText.matchAll(/(\S+)\s*\(T\s?(\d)\)|\bTerminal\s*:?\s*(?:T\s?-?\s?)?(\d)\b/gi)) {
+      if (t[1] && toCity && toCity.split(/\s+/).pop() === t[1].toLowerCase()) continue;
+      details.terminal = `T${t[2] ?? t[3]}`;
+      break;
+    }
   }
   return details;
 }

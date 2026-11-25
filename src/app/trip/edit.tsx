@@ -312,14 +312,15 @@ export default function EditTrip() {
     setReadNote(`Read ${useful.length} screenshots: ${parts.join(', ')}.${between} Check the times before saving.`);
   };
 
-  /** In person mode, a ticket that names only one person goes on their plan. */
+  /**
+   * In person mode, a ticket that names only someone else: offer to put it
+   * on their plan. Not done unasked, since family often share one booking.
+   */
+  const [namedPerson, setNamedPerson] = useState<{ id: string; name: string } | null>(null);
   const followPassenger = (text: string | undefined) => {
     if (!personMode) return;
     const named = namedOn(text, travellers(currentTrip!, data.owners));
-    if (named.length === 1 && named[0].id !== personId) {
-      setPersonId(named[0].id);
-      setReadNote((n) => `${n ?? ''} The ticket names ${named[0].name}, so it's on ${named[0].name}'s plan.`.trim());
-    }
+    setNamedPerson(named.length === 1 && named[0].id !== personId ? { id: named[0].id, name: named[0].name } : null);
   };
 
   const fillFromScreenshot = async () => {
@@ -479,6 +480,18 @@ export default function EditTrip() {
           {readNote ??
             'Add your bookings one at a time or all at once. StashCall reads them on your phone, works out the way there and the way home, connections included, and keeps them with the trip for everyone on it.'}
         </Text>
+        {namedPerson && namedPerson.id !== personId ? (
+          <Text
+            style={styles.textLink}
+            onPress={() => {
+              setPersonId(namedPerson.id);
+              setNamedPerson(null);
+            }}
+            accessibilityRole="button"
+          >
+            This ticket names {namedPerson.name}. Put these flights on {namedPerson.name}'s plan instead?
+          </Text>
+        ) : null}
         {joined.flight || joined.returnFlight ? (
           <Text style={styles.textLink} onPress={keepOnlyRead} accessibilityRole="button">
             {joined.flight && joined.returnFlight ? 'Joined to the flights that were already there' : joined.flight ? 'Joined to the flight that was already there' : 'Joined to the flight home that was already there'}. Not
