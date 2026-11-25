@@ -143,15 +143,17 @@ function findAirports(text: string): Airport[] {
     const a = AIRPORTS[m[1]];
     if (a) hits.push({ index: m.index, airport: a });
   }
+  // A city named alongside its code is that airport: "London (LGW)" is Gatwick, not Heathrow.
+  const coded = new Map<string, Airport>();
+  for (const h of hits) if (!coded.has(h.airport.city)) coded.set(h.airport.city, h.airport);
   for (const m of text.matchAll(CITY)) {
     const a = BY_CITY.get(m[1].toLowerCase());
-    if (a) hits.push({ index: m.index, airport: a });
+    if (a) hits.push({ index: m.index, airport: coded.get(a.city) ?? a });
   }
   hits.sort((a, b) => a.index - b.index);
   const seen: Airport[] = [];
   for (const { airport } of hits) {
-    // A city and its own code ("Mumbai … BOM") are one stop.
-    if (!seen.some((s) => s.code === airport.code || s.city === airport.city)) seen.push(airport);
+    if (!seen.some((s) => s.code === airport.code)) seen.push(airport);
   }
   return seen;
 }

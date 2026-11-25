@@ -103,6 +103,8 @@ export default function EditTrip() {
   const saved = useRef(false);
   // Which legs came from a screenshot, so picking a different person keeps them.
   const fromTicket = useRef({ flight: false, returnFlight: false });
+  // The legs exactly as read, so a time the user then corrects is kept as typed.
+  const readLegs = useRef<{ flight?: FlightLeg; returnFlight?: FlightLeg }>({});
   // False while the flight is still the blank form's placeholder.
   const flightTouched = useRef(false);
   const addedRef = useRef(added);
@@ -128,7 +130,8 @@ export default function EditTrip() {
     if (outbound && !d.returnFlight && !d.checkout && isReturnOf(outbound, d)) {
       fromTicket.current.returnFlight = true;
       setHasReturn(true);
-      setReturnFlight(flightLeg(d, hasCheckout ? checkout.timeZone : deviceZone(), hasCheckout && !!checkout.timeZoneConfirmed));
+      readLegs.current.returnFlight = flightLeg(d, hasCheckout ? checkout.timeZone : deviceZone(), hasCheckout && !!checkout.timeZoneConfirmed);
+      setReturnFlight(readLegs.current.returnFlight);
       setReadNote(`Added your flight home: ${describeTicket(d, formatLocalDate)}. Check the times before saving.`);
       return;
     }
@@ -138,6 +141,7 @@ export default function EditTrip() {
     if (outbound && draft.returnFlight && d.departure === outbound.departure) {
       fromTicket.current.returnFlight = true;
       setHasReturn(true);
+      readLegs.current.returnFlight = draft.returnFlight;
       setReturnFlight(draft.returnFlight);
       setReadNote(`Added your flight home: ${describeTicket(d.returnFlight!, formatLocalDate)}. Check the times before saving.`);
       return;
@@ -147,6 +151,7 @@ export default function EditTrip() {
       fromTicket.current.flight = true;
       flightTouched.current = true;
       setHasFlight(true);
+      readLegs.current.flight = draft.flight;
       setFlight(draft.flight);
     } else if (!existing && !flightTouched.current) {
       // A hotel-only booking: don't keep the made-up flight from a blank form,
@@ -160,6 +165,7 @@ export default function EditTrip() {
     if (draft.returnFlight) {
       fromTicket.current.returnFlight = true;
       setHasReturn(true);
+      readLegs.current.returnFlight = draft.returnFlight;
       setReturnFlight(draft.returnFlight);
     }
     setReadNote(`Filled in from your screenshot: ${describeTicket(d, formatLocalDate)}. Check the times before saving.`);
@@ -252,8 +258,14 @@ export default function EditTrip() {
     // A second booking for the same journey (Udaipur → Delhi, then Delhi →
     // Pantnagar) keeps the earlier flight each way: the day starts there.
     const own = currentTrip.personFlights?.[person.id];
-    const out = hasFlight ? (fromTicket.current.flight ? firstLegOfDay(own?.flight, flight) : flight) : undefined;
-    const home = hasReturn ? (fromTicket.current.returnFlight ? firstLegOfDay(own?.returnFlight, returnFlight) : returnFlight) : undefined;
+    // Only for legs left as read: a time corrected by hand is saved as typed.
+    const asRead = (leg: FlightLeg, read?: FlightLeg) => !!read && JSON.stringify(leg) === JSON.stringify(read);
+    const out = hasFlight ? (asRead(flight, readLegs.current.flight) ? firstLegOfDay(own?.flight, flight) : flight) : undefined;
+    const home = hasReturn
+      ? asRead(returnFlight, readLegs.current.returnFlight)
+        ? firstLegOfDay(own?.returnFlight, returnFlight)
+        : returnFlight
+      : undefined;
     await update((d) => {
       let next = setPersonFlights(d, tripId, person.id, { flight: out, returnFlight: home });
       // Their own flights mean they're going.

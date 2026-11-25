@@ -277,3 +277,11 @@ describe('two bookings for one journey', () => {
     expect(firstLegOfDay(udaipur, later)).toBe(later);
   });
 });
+
+describe('cities and codes', () => {
+  it('keeps the airport code a ticket gives for a city', () => {
+    const d = parseTicketText(['London (LGW) to Paris (ORY)', 'Flight AF1234', '5 Feb 2027', 'Departs 09:40'], today);
+    expect(d.from?.code).toBe('LGW');
+    expect(d.to?.code).toBe('ORY');
+  });
+});
