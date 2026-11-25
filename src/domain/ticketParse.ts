@@ -142,24 +142,80 @@ const CITY = new RegExp(`\\b(${[...BY_CITY.keys()].map((c) => c.replace(/[.*+?^$
  * only names cities ("Delhi (T1)" on IndiGo), by city.
  */
 function findAirports(text: string): Airport[] {
-  const hits: { index: number; airport: Airport }[] = [];
+  const seen: Airport[] = [];
+  for (const { airport } of airportHits(text)) {
+    if (!seen.some((s) => s.code === airport.code)) seen.push(airport);
+  }
+  return seen;
+}
+
+/** Every airport named, in order, repeats included, with where it ends. */
+function airportHits(text: string): { index: number; end: number; airport: Airport }[] {
+  const hits: { index: number; end: number; airport: Airport }[] = [];
   for (const m of text.matchAll(/\b([A-Z]{3})\b/g)) {
     const a = AIRPORTS[m[1]];
-    if (a) hits.push({ index: m.index, airport: a });
+    if (a) hits.push({ index: m.index, end: m.index + m[0].length, airport: a });
   }
   // A city named alongside its code is that airport: "London (LGW)" is Gatwick, not Heathrow.
   const coded = new Map<string, Airport>();
   for (const h of hits) if (!coded.has(h.airport.city)) coded.set(h.airport.city, h.airport);
   for (const m of text.matchAll(CITY)) {
     const a = BY_CITY.get(m[1].toLowerCase());
-    if (a) hits.push({ index: m.index, airport: coded.get(a.city) ?? a });
+    if (a) hits.push({ index: m.index, end: m.index + m[0].length, airport: coded.get(a.city) ?? a });
   }
-  hits.sort((a, b) => a.index - b.index);
-  const seen: Airport[] = [];
-  for (const { airport } of hits) {
-    if (!seen.some((s) => s.code === airport.code)) seen.push(airport);
+  return hits.sort((a, b) => a.index - b.index);
+}
+
+/**
+ * A booking table read column by column, as the phone's reader often does
+ * with IndiGo's: every date, then every From city, then every departure
+ * time, then every flight number. Lines the columns back up into one flight
+ * per row. Undefined when the text isn't laid out like that.
+ */
+function columnFlights(text: string, today: Date): FlightDetails[] | undefined {
+  const numbers: { value: string; index: number }[] = [];
+  for (const m of text.matchAll(/\b([A-Z]{2}|[A-Z]\d|\d[A-Z])\s?(\d{2,4})\b/g)) {
+    if (/^(AM|PM|NO|TO|OF|ON|AT|IN|BY)$/.test(m[1])) continue;
+    const value = `${m[1]}${m[2]}`;
+    if (!numbers.some((n) => n.value === value)) numbers.push({ value, index: m.index });
   }
-  return seen;
+  const n = numbers.length;
+  if (n < 2) return undefined;
+  const firstNumber = numbers[0].index;
+  const dates = findDates(text).filter((d) => d.index < firstNumber);
+  if (dates.length < n) return undefined;
+  const depart = text.search(/\bdepart/i);
+  if (depart === -1 || depart > firstNumber) return undefined;
+  const times = findTimes(text.slice(depart, firstNumber)).slice(0, n);
+  if (times.length < n) return undefined;
+
+  // The From and To columns: the cities after each heading.
+  const column = (heading: RegExp, until: RegExp) => {
+    const start = text.search(heading);
+    if (start === -1) return [];
+    const rest = text.slice(start);
+    const stop = rest.search(until);
+    const part = stop === -1 ? rest : rest.slice(0, stop);
+    // A code right after its city ("Delhi (T1) DEL") is the same stop.
+    return airportHits(part)
+      .filter((h, i, all) => i === 0 || !(all[i - 1].airport.code === h.airport.code && h.index - all[i - 1].end < 12))
+      .map((h) => ({ airport: h.airport, terminal: /^\s*\(T\s?(\d)\)/.exec(part.slice(h.end))?.[1] }));
+  };
+  const from = column(/^\s*From\b/im, /\bdepart/i);
+  const to = column(/^\s*To\s*$/im, /\barriv/i);
+
+  return numbers.map((num, i) => {
+    const f: FlightDetails = {
+      flightNumber: num.value,
+      departure: local(withYear(dates[i].value, today), times[i].value),
+    };
+    const a = from[i]?.airport ?? to[i - 1]?.airport;
+    const b = to[i]?.airport ?? from[i + 1]?.airport;
+    if (a) f.from = a;
+    if (b) f.to = b;
+    if (from[i]?.terminal) f.terminal = `T${from[i].terminal}`;
+    return f;
+  });
 }
 
 /**
@@ -193,8 +249,7 @@ export function parseTicketText(blocks: string[], today: Date = new Date()): Tic
 
   // A booking with an outbound and a return flight lists two flight numbers.
   // Read each part on its own, then take the earliest as the outbound.
-  const flights = splitByFlight(flightText)
-    .map((part) => parseFlight(part, today))
+  const flights = (columnFlights(flightText, today) ?? splitByFlight(flightText).map((part) => parseFlight(part, today)))
     .filter((f): f is FlightDetails => !!f.departure)
     .sort((a, b) => (a.departure! < b.departure! ? -1 : 1));
 

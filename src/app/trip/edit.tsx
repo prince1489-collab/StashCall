@@ -10,7 +10,7 @@ import { draftFromTicket, joinLegs, flightLeg, isReturnOf } from '../../domain/t
 import { describeTicket, hasTripDetails, type TicketDetails } from '../../domain/ticketParse';
 import { buildTimeline, defaultFlight } from '../../domain/timeline';
 import { autoTripName, isAutoName } from '../../domain/trips';
-import { namedOn, sortJourneys } from '../../domain/journeys';
+import { journeyFlights, namedOn, sortJourneys } from '../../domain/journeys';
 import { AIRPORTS } from '../../domain/airports';
 import type { FlightLeg, HotelCheckout, Ticket, Trip } from '../../domain/types';
 import { deletePhoto, pickTickets } from '../../storage/photos';
@@ -139,12 +139,22 @@ export default function EditTrip() {
    * flights joined with every leg read on this screen so far (Udaipur → Delhi,
    * then Delhi → Pantnagar).
    */
+  /**
+   * The saved flights, unless a ticket just read puts one of their flights
+   * the other way: a misread left Bajrang's 6E2008 out as his flight home.
+   */
+  const cleanBase = (pid: string, k: 'flight' | 'returnFlight') => {
+    const base = baseFor(pid, k);
+    const other = readLegs.current[k === 'flight' ? 'returnFlight' : 'flight'];
+    const numbers = new Set(other.flatMap(journeyFlights).map((f) => f.flightNumber).filter(Boolean));
+    return base && journeyFlights(base).some((f) => f.flightNumber && numbers.has(f.flightNumber)) ? undefined : base;
+  };
   const read = (pid: string, k: 'flight' | 'returnFlight', leg?: FlightLeg): FlightLeg => {
     if (leg) readLegs.current[k].push(leg);
     const legs = readLegs.current[k];
-    const journey = legs.reduce<FlightLeg | null | undefined>((had, l) => joinLegs(had, l), baseFor(pid, k))!;
+    const journey = legs.reduce<FlightLeg | null | undefined>((had, l) => joinLegs(had, l), cleanBase(pid, k))!;
     // Joined onto a flight that was already there: let the user undo that.
-    if (leg && baseFor(pid, k)) {
+    if (leg && cleanBase(pid, k)) {
       const alone = legs.reduce<FlightLeg | undefined>((had, l) => joinLegs(had, l), undefined)!;
       if (JSON.stringify(alone) !== JSON.stringify(journey)) setJoined((j) => ({ ...j, [k]: true }));
     }
