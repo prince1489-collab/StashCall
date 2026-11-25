@@ -69,6 +69,24 @@ export interface FlightLeg {
   destination?: string;
   /** For a flight home: true once the user has confirmed its zone. */
   timeZoneConfirmed?: boolean;
+  /** e.g. "6E2008", when read from a ticket. */
+  flightNumber?: string;
+  /** Departure terminal, e.g. "T2". */
+  terminal?: string;
+  /** Later flights the same journey connects to, in order. */
+  connections?: Connection[];
+}
+
+/** A connecting flight: Delhi → Pantnagar after Udaipur → Delhi. */
+export interface Connection {
+  /** Scheduled departure, in the connecting airport's zone. */
+  departure: LocalDateTime;
+  timeZone: string;
+  flightNumber?: string;
+  /** IATA code of the airport it leaves from. */
+  airport?: string;
+  destination?: string;
+  terminal?: string;
 }
 
 export interface HotelCheckout {
@@ -155,7 +173,9 @@ export type StepKind =
   | 'returnLeaveCheck'
   | 'returnLeave'
   | 'returnAirport'
-  | 'returnTakeoff';
+  | 'returnTakeoff'
+  | 'connection'
+  | 'returnConnection';
 
 export interface TimelineStep {
   kind: StepKind;
@@ -171,4 +191,8 @@ export interface TimelineStep {
   notify: boolean;
   /** Which items this step reminds about. */
   itemMoment?: 'home' | 'checkout';
+  /** When its reminder goes off, if not at the step itself. */
+  remindAt?: Date;
+  /** A line of detail, e.g. "6E7415 to Pantnagar from T1". */
+  detail?: string;
 }

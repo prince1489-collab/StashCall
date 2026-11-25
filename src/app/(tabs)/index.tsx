@@ -41,7 +41,7 @@ function countdown(at: Date, now: Date): string {
 export default function Today() {
   // Shown as this phone's person travels it, with their own flights.
   // Today follows the next trip coming up, whichever trip the Trip tab is showing.
-  const { data, myComingTrip: currentTrip, ready, update } = useAppData();
+  const { data, myComingTrip: currentTrip, ready, update, viewTrip } = useAppData();
   const now = useNow();
   const [showItems, setShowItems] = useState(false);
   if (!ready) return null;
@@ -130,7 +130,14 @@ export default function Today() {
             {countdown(next.at, now)}.
             {nextNames.length > 0 ? ` ${itemCountLabel(next, nextNames.length)}.` : ''}
           </Text>
-          <Text style={styles.nudgeLink} onPress={() => router.navigate('/trip')} accessibilityRole="button">
+          <Text
+            style={styles.nudgeLink}
+            onPress={() => {
+              viewTrip(currentTrip?.id);
+              router.navigate('/trip');
+            }}
+            accessibilityRole="button"
+          >
             See the whole plan
           </Text>
         </View>

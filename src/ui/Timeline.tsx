@@ -40,6 +40,7 @@ export function Timeline({
               <Text style={styles.time}>{s.localTime}</Text>
               <View style={styles.body}>
                 <Text style={styles.title}>{s.title}</Text>
+                {s.detail ? <Text style={styles.meta}>{s.detail}</Text> : null}
                 {zones.size > 1 ? <Text style={styles.meta}>{zoneLabel(s.timeZone)} time</Text> : null}
                 {items.length > 0 ? (
                   <Text

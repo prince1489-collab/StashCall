@@ -6,9 +6,11 @@ import { DEFAULTS } from '../../domain/defaults';
 import { savedItems } from '../../domain/household';
 import { setPersonFlights, travellers, tripFor } from '../../domain/people';
 import { addTickets } from '../../domain/tickets';
-import { draftFromTicket, firstLegOfDay, flightLeg, isReturnOf } from '../../domain/ticketDraft';
+import { draftFromTicket, joinLegs, flightLeg, isReturnOf } from '../../domain/ticketDraft';
 import { describeTicket, hasTripDetails, type TicketDetails } from '../../domain/ticketParse';
 import { buildTimeline, defaultFlight } from '../../domain/timeline';
+import { autoTripName, isAutoName } from '../../domain/trips';
+import { AIRPORTS } from '../../domain/airports';
 import type { FlightLeg, HotelCheckout, Ticket, Trip } from '../../domain/types';
 import { deletePhoto, pickTicket } from '../../storage/photos';
 import { newId } from '../../storage/store';
@@ -66,6 +68,8 @@ function newCheckout(): HotelCheckout {
   };
 }
 
+const cityOf = (code: string) => AIRPORTS[code]?.city;
+
 export default function EditTrip() {
   const { data, currentTrip, saveTrip, deleteTrip, update } = useAppData();
   const { askPermission } = useReminders();
@@ -79,6 +83,14 @@ export default function EditTrip() {
   const existing = params.new === '1' ? undefined : personMode ? tripFor(currentTrip!, personId) : currentTrip;
 
   const [name, setName] = useState(existing?.name ?? '');
+  // A name StashCall made up follows the journey: add the Delhi → Pantnagar
+  // leg and "Delhi in December" becomes "Pantnagar in December". A name the
+  // user typed stays.
+  const nameTouched = useRef(!!existing && !isAutoName(existing.name, existing.flight, cityOf));
+  const typeName = (n: string) => {
+    nameTouched.current = true;
+    setName(n);
+  };
   const [hasFlight, setHasFlight] = useState(existing ? !!existing.flight : true);
   const [flight, setFlight] = useState<FlightLeg>(
     existing?.flight ?? defaultFlight(localDaysFromNow(7, 10), deviceZone(), true),
@@ -104,9 +116,31 @@ export default function EditTrip() {
   // Which legs came from a screenshot, so picking a different person keeps them.
   const fromTicket = useRef({ flight: false, returnFlight: false });
   // The legs exactly as read, so a time the user then corrects is kept as typed.
-  const readLegs = useRef<{ flight?: FlightLeg; returnFlight?: FlightLeg }>({});
+  // Every leg read on this screen, in order, so later screenshots add to earlier ones.
+  const readLegs = useRef<{ flight: FlightLeg[]; returnFlight: FlightLeg[] }>({ flight: [], returnFlight: [] });
   // False while the flight is still the blank form's placeholder.
   const flightTouched = useRef(false);
+
+  /**
+   * The flights a booking read now joins, when it's for the same day: the
+   * trip's own, or in person mode that person's. On their own phone a person
+   * with none of their own flies the trip's (they made it); never someone else's.
+   */
+  const baseFor = (pid: string, k: 'flight' | 'returnFlight'): FlightLeg | null | undefined => {
+    if (!personMode) return existing?.[k];
+    const own = currentTrip!.personFlights?.[pid];
+    if (own && own[k] !== undefined) return own[k];
+    return pid === data.meId ? currentTrip![k] : undefined;
+  };
+  /**
+   * Records a leg read from a ticket and returns the journey: the saved
+   * flights joined with every leg read on this screen so far (Udaipur → Delhi,
+   * then Delhi → Pantnagar).
+   */
+  const read = (pid: string, k: 'flight' | 'returnFlight', leg?: FlightLeg): FlightLeg => {
+    if (leg) readLegs.current[k].push(leg);
+    return readLegs.current[k].reduce<FlightLeg | null | undefined>((had, l) => joinLegs(had, l), baseFor(pid, k))!;
+  };
   const addedRef = useRef(added);
   addedRef.current = added;
   useEffect(
@@ -130,8 +164,7 @@ export default function EditTrip() {
     if (outbound && !d.returnFlight && !d.checkout && isReturnOf(outbound, d)) {
       fromTicket.current.returnFlight = true;
       setHasReturn(true);
-      readLegs.current.returnFlight = flightLeg(d, hasCheckout ? checkout.timeZone : deviceZone(), hasCheckout && !!checkout.timeZoneConfirmed);
-      setReturnFlight(readLegs.current.returnFlight);
+      setReturnFlight(read(personId, 'returnFlight', flightLeg(d, hasCheckout ? checkout.timeZone : deviceZone(), hasCheckout && !!checkout.timeZoneConfirmed)));
       setReadNote(`Added your flight home: ${describeTicket(d, formatLocalDate)}. Check the times before saving.`);
       return;
     }
@@ -141,8 +174,7 @@ export default function EditTrip() {
     if (outbound && draft.returnFlight && d.departure === outbound.departure) {
       fromTicket.current.returnFlight = true;
       setHasReturn(true);
-      readLegs.current.returnFlight = draft.returnFlight;
-      setReturnFlight(draft.returnFlight);
+      setReturnFlight(read(personId, 'returnFlight', draft.returnFlight));
       setReadNote(`Added your flight home: ${describeTicket(d.returnFlight!, formatLocalDate)}. Check the times before saving.`);
       return;
     }
@@ -151,8 +183,7 @@ export default function EditTrip() {
       fromTicket.current.flight = true;
       flightTouched.current = true;
       setHasFlight(true);
-      readLegs.current.flight = draft.flight;
-      setFlight(draft.flight);
+      setFlight(read(personId, 'flight', draft.flight));
     } else if (!existing && !flightTouched.current) {
       // A hotel-only booking: don't keep the made-up flight from a blank form,
       // but keep a flight the user typed or read from an earlier screenshot.
@@ -165,11 +196,16 @@ export default function EditTrip() {
     if (draft.returnFlight) {
       fromTicket.current.returnFlight = true;
       setHasReturn(true);
-      readLegs.current.returnFlight = draft.returnFlight;
-      setReturnFlight(draft.returnFlight);
+      setReturnFlight(read(personId, 'returnFlight', draft.returnFlight));
     }
     setReadNote(`Filled in from your screenshot: ${describeTicket(d, formatLocalDate)}. Check the times before saving.`);
   };
+
+  useEffect(() => {
+    if (personMode || nameTouched.current || !hasFlight) return;
+    const auto = autoTripName(flight, cityOf);
+    if (auto) setName(auto);
+  }, [personMode, hasFlight, flight]);
 
   // Picking someone else shows their flights, except a leg read from the
   // screenshot, which is what the user is assigning to them.
@@ -181,10 +217,15 @@ export default function EditTrip() {
     if (!fromTicket.current.flight) {
       setHasFlight(!!theirs.flight);
       if (theirs.flight) setFlight(theirs.flight);
+    } else if (readLegs.current.flight.length > 0) {
+      // The screenshot's flight now joins this person's flights instead.
+      setFlight(read(personId, 'flight'));
     }
     if (!fromTicket.current.returnFlight) {
       setHasReturn(!!theirs.returnFlight);
       if (theirs.returnFlight) setReturnFlight(theirs.returnFlight);
+    } else if (readLegs.current.returnFlight.length > 0) {
+      setReturnFlight(read(personId, 'returnFlight'));
     }
   }, [personId]); // eslint-disable-line react-hooks/exhaustive-deps
 
@@ -255,17 +296,8 @@ export default function EditTrip() {
     }
     const tripId = currentTrip.id;
     saved.current = true;
-    // A second booking for the same journey (Udaipur → Delhi, then Delhi →
-    // Pantnagar) keeps the earlier flight each way: the day starts there.
-    const own = currentTrip.personFlights?.[person.id];
-    // Only for legs left as read: a time corrected by hand is saved as typed.
-    const asRead = (leg: FlightLeg, read?: FlightLeg) => !!read && JSON.stringify(leg) === JSON.stringify(read);
-    const out = hasFlight ? (asRead(flight, readLegs.current.flight) ? firstLegOfDay(own?.flight, flight) : flight) : undefined;
-    const home = hasReturn
-      ? asRead(returnFlight, readLegs.current.returnFlight)
-        ? firstLegOfDay(own?.returnFlight, returnFlight)
-        : returnFlight
-      : undefined;
+    const out = hasFlight ? flight : undefined;
+    const home = hasReturn ? returnFlight : undefined;
     await update((d) => {
       let next = setPersonFlights(d, tripId, person.id, { flight: out, returnFlight: home });
       // Their own flights mean they're going.
@@ -399,7 +431,7 @@ export default function EditTrip() {
       <Section title="Trip name">
         <TextInput
           value={name}
-          onChangeText={setName}
+          onChangeText={typeName}
           placeholder="Milan in December"
           placeholderTextColor={colors.muted}
           style={[styles.input, styles.name]}
@@ -446,6 +478,7 @@ export default function EditTrip() {
               value={flight.departure}
               onChange={(departure) => setF({ departure })}
             />
+            <Connections leg={flight} onChange={(connections) => setF({ connections })} />
             <SwitchRow label="International" value={flight.international} onChange={setInternational} />
             <MinutesStepper
               label="Home to airport"
@@ -523,6 +556,7 @@ export default function EditTrip() {
               value={returnFlight.departure}
               onChange={(departure) => setR({ departure })}
             />
+            <Connections leg={returnFlight} onChange={(connections) => setR({ connections })} />
             <ZoneRow
               label="Flying home from"
               hint="The time zone of that airport"
@@ -576,7 +610,44 @@ export default function EditTrip() {
   );
 }
 
+/**
+ * The flights a journey connects to that day, read from a second booking.
+ * Shown under the first flight; each can be taken off.
+ */
+function Connections({ leg, onChange }: { leg: FlightLeg; onChange: (c: FlightLeg['connections']) => void }) {
+  const list = leg.connections ?? [];
+  if (list.length === 0) return null;
+  return (
+    <View style={styles.connections}>
+      {list.map((c, i) => (
+        <View key={`${c.departure}-${i}`} style={styles.connection}>
+          <Text style={styles.connectionText}>
+            Then {c.departure.slice(11)} · {[c.airport, c.destination].filter(Boolean).join(' → ') || 'next flight'}
+            {c.flightNumber ? ` · ${c.flightNumber}` : ''}
+            {c.terminal ? ` · ${c.terminal}` : ''}
+          </Text>
+          <Text
+            style={styles.connectionRemove}
+            onPress={() => {
+              const rest = list.filter((_, j) => j !== i);
+              onChange(rest.length > 0 ? rest : undefined);
+            }}
+            accessibilityRole="button"
+            accessibilityLabel={`Remove the ${c.departure.slice(11)} flight`}
+          >
+            Remove
+          </Text>
+        </View>
+      ))}
+    </View>
+  );
+}
+
 const styles = StyleSheet.create({
+  connections: { paddingHorizontal: space.l, paddingBottom: space.m, gap: space.s },
+  connection: { flexDirection: 'row', alignItems: 'center', gap: space.m },
+  connectionText: { flex: 1, fontSize: 14, color: colors.text },
+  connectionRemove: { fontSize: 14, fontWeight: '600', color: colors.danger },
   container: { padding: space.l, paddingBottom: 48 },
   people: { flexDirection: 'row', flexWrap: 'wrap', gap: space.s, padding: space.l },
   person: { borderRadius: 999, borderWidth: 1, borderColor: colors.border, paddingHorizontal: 14, paddingVertical: 8 },

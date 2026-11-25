@@ -33,3 +33,54 @@ export function pastTrips(trips: Trip[], now: Date): Trip[] {
 export function nextTrip(trips: Trip[], now: Date): Trip | undefined {
   return upcomingTrips(trips, now)[0] ?? pastTrips(trips, now)[0] ?? trips[0];
 }
+
+const MONTH_SHORT = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
+const MONTH_LONG = ['January', 'February', 'March', 'April', 'May', 'June', 'July', 'August', 'September', 'October', 'November', 'December'];
+
+/** The travel days: out, and home when known. Wall-clock dates, "2026-12-06". */
+export function tripDays(trip: Trip): { from?: string; to?: string } {
+  // A trip with only a flight home is dated by that flight.
+  const from = (trip.flight?.departure ?? trip.checkout?.checkout ?? trip.returnFlight?.departure)?.slice(0, 10);
+  const to = (trip.returnFlight?.departure ?? (trip.flight ? trip.checkout?.checkout : undefined))?.slice(0, 10);
+  return { from, to: to && to !== from ? to : undefined };
+}
+
+/** "6–8 Dec", "28 Feb – 3 Mar", "18 Feb 2027": the year only when it isn't `thisYear`. */
+export function formatTripDays(trip: Trip, thisYear: number): string {
+  const { from, to } = tripDays(trip);
+  if (!from) return 'No date yet';
+  const part = (d: string) => ({ y: Number(d.slice(0, 4)), m: Number(d.slice(5, 7)) - 1, d: Number(d.slice(8, 10)) });
+  const a = part(from);
+  const b = to ? part(to) : undefined;
+  const year = (y: number) => (y === thisYear ? '' : ` ${y}`);
+  if (!b) return `${a.d} ${MONTH_SHORT[a.m]}${year(a.y)}`;
+  if (a.y === b.y && a.m === b.m) return `${a.d}–${b.d} ${MONTH_SHORT[a.m]}${year(b.y)}`;
+  if (a.y === b.y) return `${a.d} ${MONTH_SHORT[a.m]} – ${b.d} ${MONTH_SHORT[b.m]}${year(b.y)}`;
+  return `${a.d} ${MONTH_SHORT[a.m]}${year(a.y)} – ${b.d} ${MONTH_SHORT[b.m]}${year(b.y)}`;
+}
+
+/** "Pantnagar in December": named after where the journey ends, or undefined without a destination. */
+export function autoTripName(flight: Trip['flight'], cityOf: (code: string) => string | undefined): string | undefined {
+  if (!flight?.destination) return undefined;
+  const city = cityOf(flight.destination);
+  if (!city) return undefined;
+  return `${city} in ${MONTH_LONG[Number(flight.departure.slice(5, 7)) - 1]}`;
+}
+
+/**
+ * True when `name` is one StashCall made up rather than one the user typed:
+ * "Delhi in December" for a journey that stops in Delhi, or "My trip". Those
+ * follow the journey when it changes.
+ */
+export function isAutoName(name: string, flight: Trip['flight'], cityOf: (code: string) => string | undefined): boolean {
+  const n = name.trim();
+  if (!n || n === 'My trip') return true;
+  if (!flight) return false;
+  const month = MONTH_LONG[Number(flight.departure.slice(5, 7)) - 1];
+  if (n === `Trip in ${month}` || (flight.flightNumber && n === `Flight ${flight.flightNumber}`)) return true;
+  const stops = [...(flight.connections ?? []).flatMap((c) => [c.airport, c.destination]), flight.destination];
+  return stops.some((code) => {
+    const city = code && cityOf(code);
+    return !!city && (n === `${city} in ${month}` || n === city);
+  });
+}

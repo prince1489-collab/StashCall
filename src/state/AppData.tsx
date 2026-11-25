@@ -21,6 +21,8 @@ interface AppDataContext {
   comingTrip?: Trip;
   /** The next trip as this phone's person travels it. */
   myComingTrip?: Trip;
+  /** The trip picked from the trips list, if any. Unset, the Trip tab shows the list. */
+  viewingId?: string;
   /** Look at another trip on the Trip and Items tabs. Undefined goes back to the next one. */
   viewTrip: (id: string | undefined) => void;
   saveTrip: (trip: Trip) => Promise<void>;
@@ -111,6 +113,7 @@ export function AppDataProvider({ children }: { children: ReactNode }) {
       myTrip: current && tripFor(current, data.meId),
       comingTrip: coming,
       myComingTrip: coming && tripFor(coming, data.meId),
+      viewingId: current && current.id === viewId ? viewId : undefined,
       viewTrip: setViewId,
       saveTrip,
       deleteTrip,

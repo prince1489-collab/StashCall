@@ -13,8 +13,12 @@ export interface TicketDetails {
   departure?: LocalDateTime;
   /** Hotel checkout, in the hotel's wall-clock time. */
   checkout?: LocalDateTime;
-  /** The flight home, when the booking has one. */
-  returnFlight?: Pick<TicketDetails, 'flightNumber' | 'from' | 'to' | 'departure'>;
+  /** Departure terminal, e.g. "T1". */
+  terminal?: string;
+  /** Later flights on the same journey: Delhi → Pantnagar after Udaipur → Delhi. */
+  connections?: FlightDetails[];
+  /** The flight home, when the booking has one, with its own connections. */
+  returnFlight?: FlightDetails & { connections?: FlightDetails[] };
 }
 
 const MONTHS = ['jan', 'feb', 'mar', 'apr', 'may', 'jun', 'jul', 'aug', 'sep', 'oct', 'nov', 'dec'];
@@ -207,7 +211,14 @@ export function parseTicketText(blocks: string[], today: Date = new Date()): Tic
     // Name the trip after the final stop, not the connecting airport.
     const arrival = outbound[outbound.length - 1].to;
     if (arrival) details.to = arrival;
-    if (gap !== -1 && endsHome) details.returnFlight = flights[gap];
+    if (outbound.length > 1) details.connections = outbound.slice(1);
+    if (gap !== -1 && endsHome) {
+      // The way home, with the flights it connects to that day.
+      const home = flights.slice(gap);
+      const end = home.findIndex((f, i) => i > 0 && hoursBetween(home[i - 1].departure!, f.departure!) >= 24);
+      const legs = end === -1 ? home : home.slice(0, end);
+      details.returnFlight = { ...legs[0], ...(legs.length > 1 && { to: legs[legs.length - 1].to ?? legs[0].to, connections: legs.slice(1) }) };
+    }
   } else {
     Object.assign(details, parseFlight(flightText, today));
   }
@@ -222,7 +233,13 @@ function hoursBetween(a: LocalDateTime, b: LocalDateTime): number {
 }
 
 /** One flight's worth of details. */
-export type FlightDetails = Pick<TicketDetails, 'flightNumber' | 'from' | 'to' | 'departure'>;
+export interface FlightDetails {
+  flightNumber?: string;
+  from?: Airport;
+  to?: Airport;
+  departure?: LocalDateTime;
+  terminal?: string;
+}
 
 /** Airline codes that contain a digit: IndiGo, Go First, AirAsia India, easyJet, Wizz, JetBlue, Frontier, Cebu, Jet. */
 const DIGIT_AIRLINES = new Set(['6E', 'G8', 'I5', 'U2', 'W6', 'B6', 'F9', '5J', '9W']);
@@ -273,7 +290,12 @@ function parseFlight(flightText: string, today: Date): FlightDetails {
     const isFlight = time && (airports.length > 0 || /flight|depart|boarding|gate|seat/i.test(flightText));
     if (isFlight) details.departure = local(withYear(date.value, today), time.value);
   }
-  if (details.departure) details.flightNumber = findFlightNumber(flightText);
+  if (details.departure) {
+    details.flightNumber = findFlightNumber(flightText);
+    // The first terminal named is where it leaves from: "Delhi (T1)", "Terminal 5".
+    const t = /\(T\s?(\d)\)|\bTerminal\s+(\d)\b/i.exec(flightText);
+    if (t) details.terminal = `T${t[1] ?? t[2]}`;
+  }
   return details;
 }
 
