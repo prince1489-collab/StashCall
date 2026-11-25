@@ -123,8 +123,9 @@ const local = (day: Day, time: string): LocalDateTime => `${day.y}-${pad(day.m)}
 const NOT_DEPARTURE = /board|gate|arriv|land|check[\s-]?in|duration|clos/i;
 
 function findFlightNumber(text: string): string | undefined {
-  const all = [...text.matchAll(/\b([A-Z]{2}|[A-Z]\d|\d[A-Z])\s?(\d{1,4})\b/g)].filter(
-    (m) => !/^(AM|PM|NO|TO|OF|ON|AT|IN|BY)$/.test(m[1]),
+  const all = [...text.matchAll(/\b([A-Z]{2}|[A-Z]\d|\d[A-Z])(?:\s?-\s?|\s?)(\d{1,4})\b/g)].filter(
+    // Codes with a digit ("6E" IndiGo) only from the known list: "G57" is not a flight.
+    (m) => !/^(AM|PM|NO|TO|OF|ON|AT|IN|BY)$/.test(m[1]) && !(/\d/.test(m[1]) && !DIGIT_AIRLINES.has(m[1])),
   );
   // Prefer one next to the word "flight", then any with a two-letter code.
   const near = all.find((m) => /flight/i.test(lineAt(text, m.index)));
@@ -174,8 +175,10 @@ function airportHits(text: string): { index: number; end: number; airport: Airpo
  */
 function columnFlights(text: string, today: Date): FlightDetails[] | undefined {
   const numbers: { value: string; index: number }[] = [];
-  for (const m of text.matchAll(/\b([A-Z]{2}|[A-Z]\d|\d[A-Z])\s?(\d{2,4})\b/g)) {
+  for (const m of text.matchAll(/\b([A-Z]{2}|[A-Z]\d|\d[A-Z])(?:\s?-\s?|\s?)(\d{2,4})\b/g)) {
     if (/^(AM|PM|NO|TO|OF|ON|AT|IN|BY)$/.test(m[1])) continue;
+    // "(A321)" is the aircraft: codes with a digit only for known airlines.
+    if (/\d/.test(m[1]) && !DIGIT_AIRLINES.has(m[1])) continue;
     const value = `${m[1]}${m[2]}`;
     if (!numbers.some((n) => n.value === value)) numbers.push({ value, index: m.index });
   }
@@ -308,7 +311,7 @@ const DIGIT_AIRLINES = new Set(['6E', 'G8', 'I5', 'U2', 'W6', 'B6', 'F9', '5J', 
 function splitByFlight(text: string): string[] {
   const seen = new Set<string>();
   const starts: number[] = [];
-  for (const m of text.matchAll(/\b([A-Z]{2}|[A-Z0-9]{2})\s?(\d{1,4})\b/g)) {
+  for (const m of text.matchAll(/\b([A-Z]{2}|[A-Z0-9]{2})(?:\s?-\s?|\s?)(\d{1,4})\b/g)) {
     const code = `${m[1]}${m[2]}`;
     // Airline codes with a digit ("6E" IndiGo) only from a known list, so
     // "T1 06:10" (terminal 1) isn't read as a flight.

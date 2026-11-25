@@ -285,6 +285,21 @@ describe('IndiGo tables read column by column', () => {
     expect(d.returnFlight?.terminal).toBeUndefined();
   });
 
+  it("reads Bajrang's Udaipur booking, aircraft types and all", () => {
+    // The email as his phone read it: "(A321)" is the aircraft, not a flight.
+    const blocks: string[] = ["Status", "CONFIRMED", "IndiGo Passenger - 1/1", "Date", "IndiGo Flight(s)", "06 Dec\n26", "IndiGo 17:33", "Date", "to me v", "*Booking Date reflects in UTC (Universal Time Coordinated), all other timings mentioned are as per\nLocal Time.", "From", "08 Dec\n26", "(Terminal)", "IndiGo Flight(s)", "Udaipur", "From", "(Terminal)", "Delhi (T1)", "Date of Booking*", "Remove", "28 Oct 26 12:03:19 (UTC)", "Departs", "08:55", "Mr. Bajrang singh Rathore", "18:00", "Departs", "Flight", "Number", "(Aircraft", "type)", "6E2008", "(A321)", "Flight", "Number", "(Aircraft", "type)", "Check-in now", "Mr. Bajrang singh Rathore", "6E6228", "(A321)", "Check-", "in/Bag", "drop", "closes", "07:55", "Check-", "in/Bag", "drop", "closes", "17:00", "PNR/Booking Ref.: V9VH6P", "Payment Status", "Approved", "To", "(Terminal)", "Flight Status", "Delhi (T2)", "To", "(Terminal)", "Udaipur", "g48", "Arrives Via", "10:20", "Arrives Via", "19:20", "Close"];
+    const d = parseTicketText(blocks, new Date('2026-11-25T04:00:00Z'));
+    expect(d.departure).toBe('2026-12-06T08:55');
+    expect(d.flightNumber).toBe('6E2008');
+    expect(d.from?.code).toBe('UDR');
+    expect(d.to?.code).toBe('DEL');
+    expect(d.returnFlight?.departure).toBe('2026-12-08T18:00');
+    expect(d.returnFlight?.flightNumber).toBe('6E6228');
+    expect(d.returnFlight?.from?.code).toBe('DEL');
+    expect(d.returnFlight?.terminal).toBe('T1');
+    expect(d.returnFlight?.to?.code).toBe('UDR');
+  });
+
   it('leaves other layouts to the row reader', () => {
     const d = parseTicketText(
       ['Departure', '5 Feb 2027', 'LHR 09:40', 'Arrival', '5 Feb 2027', 'BOM 23:50', 'BA137', 'BA138', 'Departure', '19 Feb 2027', 'BOM 02:15', 'Arrival', '19 Feb 2027', 'LHR 07:05'],
@@ -311,6 +326,18 @@ describe('Yatra e-tickets', () => {
     expect(d.from?.code).toBe('DEL');
     expect(d.to?.code).toBe('BOM');
     expect(d.terminal).toBe('T1');
+    expect(d.flightNumber).toBe('6E328');
+  });
+
+  it('reads an Akasa flight number written with a dash', () => {
+    const d = parseTicketText(
+      ['E-Ticket booked with', 'yatra', 'Departure Flight', 'Mumbai to New Delhi | Sun, 06 Dec 2026', 'PNR Number : P43QHI',
+        '07:00 | SAVER FARE', 'Akasa Air QP - 1111', 'Mumbai BOM', 'Sun, 06 Dec 2026 07:00', 'Chatrapati Shivaji Airport', 'Terminal: T-2',
+        '— 2h 25m —', 'Economy', 'DEL New Delhi', 'Sun, 06 Dec 2026', '09:25', 'Indira Gandhi Airport', 'Terminal: T-1', 'Cabin Baggage: 7 Kgs', 'G57'],
+      new Date('2026-11-25T04:00:00Z'),
+    );
+    expect(d.flightNumber).toBe('QP1111');
+    expect(d.terminal).toBe('T2');
   });
 });
 
