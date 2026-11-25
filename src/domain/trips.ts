@@ -39,7 +39,8 @@ const MONTH_LONG = ['January', 'February', 'March', 'April', 'May', 'June', 'Jul
 
 /** The travel days: out, and home when known. Wall-clock dates, "2026-12-06". */
 export function tripDays(trip: Trip): { from?: string; to?: string } {
-  const from = (trip.flight?.departure ?? trip.checkout?.checkout)?.slice(0, 10);
+  // A trip with only a flight home is dated by that flight.
+  const from = (trip.flight?.departure ?? trip.checkout?.checkout ?? trip.returnFlight?.departure)?.slice(0, 10);
   const to = (trip.returnFlight?.departure ?? (trip.flight ? trip.checkout?.checkout : undefined))?.slice(0, 10);
   return { from, to: to && to !== from ? to : undefined };
 }

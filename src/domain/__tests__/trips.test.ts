@@ -43,6 +43,7 @@ describe('trip dates and names', () => {
     expect(formatTripDays(london, 2026)).toBe('10 Feb 2027');
     expect(formatTripDays({ ...delhi, returnFlight: defaultFlight('2027-01-03T10:00', 'Asia/Kolkata', false) }, 2026)).toBe('6 Dec – 3 Jan 2027');
     expect(formatTripDays(draft, 2026)).toBe('No date yet');
+    expect(formatTripDays({ ...draft, returnFlight: defaultFlight('2026-12-08T13:20', 'Asia/Kolkata', false) }, 2026)).toBe('8 Dec');
   });
 
   it('names a trip after where it ends', async () => {
