@@ -286,6 +286,13 @@ describe('two bookings for one journey', () => {
     // A different trip altogether: the new flight replaces it.
     const later = defaultFlight('2027-02-10T09:00', 'Asia/Kolkata', true);
     expect(joinLegs(udaipur, later)).toBe(later);
+    // A flight with no airports (the form's made-up one) is replaced, not joined.
+    const blank = defaultFlight('2026-12-06T17:33', 'Asia/Kolkata', true);
+    const bom = { ...defaultFlight('2026-12-06T07:00', 'Asia/Kolkata', false), airport: 'BOM', destination: 'DEL' };
+    expect(joinLegs(blank, bom)).toBe(bom);
+    // Nor are two flights that don't meet: Udaipur → Delhi, then Mumbai → Goa.
+    const goa = { ...defaultFlight('2026-12-06T15:00', 'Asia/Kolkata', false), airport: 'BOM', destination: 'GOI' };
+    expect(joinLegs(udaipur, goa)).toBe(goa);
   });
 });
 
