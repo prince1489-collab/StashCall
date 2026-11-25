@@ -136,7 +136,22 @@ function findFlightNumber(text: string): string | undefined {
   // Prefer one next to the word "flight", then any with a two-letter code.
   const near = all.find((m) => /flight/i.test(lineAt(text, m.index)));
   const best = near ?? all.find((m) => /^[A-Z]{2}$/.test(m[1])) ?? all[0];
-  return best ? `${best[1]}${best[2]}` : undefined;
+  return best ? `${best[1]}${best[2]}` : misreadFlightNumber(text);
+}
+
+/**
+ * A number the phone misread next to an airline's name: "Akasa Air QP -11n"
+ * is QP1111. OCR reads 1 as l, I or |, two 1s run together as n, and 0 as O.
+ */
+function misreadFlightNumber(text: string): string | undefined {
+  const AIRLINE = /\b(air|airways|airlines|indigo|akasa|vistara|spicejet|emirates|qatar|etihad)\b/i;
+  for (const m of text.matchAll(/\b([A-Z]{2}|[A-Z]\d|\d[A-Z])\s?-?\s?([0-9lI|Oon]{2,6})\b/g)) {
+    if (!AIRLINE.test(lineAt(text, m.index)) || !/\d/.test(m[2])) continue;
+    if (/\d/.test(m[1]) && !DIGIT_AIRLINES.has(m[1])) continue;
+    const digits = m[2].replace(/n/g, '11').replace(/[lI|]/g, '1').replace(/[Oo]/g, '0');
+    if (/^\d{1,4}$/.test(digits)) return `${m[1]}${digits}`;
+  }
+  return undefined;
 }
 
 /** The first airport listed for each city: "Delhi" → DEL. */

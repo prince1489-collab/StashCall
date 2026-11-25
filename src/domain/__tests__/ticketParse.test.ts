@@ -392,6 +392,21 @@ describe('two bookings for one journey', () => {
   });
 });
 
+describe('misread flight numbers', () => {
+  it('reads "QP -11n" next to the airline as QP1111', () => {
+    // The phone's own reading of Mahiman's Yatra ticket.
+    const d = parseTicketText(
+      ['yatra', 'Departure Flight', 'Mumbai to New Delhi | Sun, 06 Dec 2026 PNR Number: P43QHI', '07:00 | SAVER FARE',
+        'Akasa Air QP -11n', 'Mumbai BOM', 'Sun, 06 Dec 2026 07:00', 'Chatrapati Shivaji Airport', 'Terminal: T-2',
+        '-2h 25m-', 'Economy', '951', 'l G57', 'DEL New Delhi', 'Sun, 06 Dec 2026', '09:25', 'Indira Gandhi', 'Airport', 'Terminal: T-1'],
+      today,
+    );
+    expect(d.flightNumber).toBe('QP1111');
+    expect(d.terminal).toBe('T2');
+    expect(d.departure).toBe('2026-12-06T07:00');
+  });
+});
+
 describe('cities and codes', () => {
   it('keeps the airport code a ticket gives for a city', () => {
     const d = parseTicketText(['London (LGW) to Paris (ORY)', 'Flight AF1234', '5 Feb 2027', 'Departs 09:40'], today);
