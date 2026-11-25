@@ -311,6 +311,18 @@ describe('Yatra e-tickets', () => {
     expect(d.from?.code).toBe('DEL');
     expect(d.to?.code).toBe('BOM');
     expect(d.terminal).toBe('T1');
+    expect(d.flightNumber).toBe('6E328');
+  });
+
+  it('reads an Akasa flight number written with a dash', () => {
+    const d = parseTicketText(
+      ['E-Ticket booked with', 'yatra', 'Departure Flight', 'Mumbai to New Delhi | Sun, 06 Dec 2026', 'PNR Number : P43QHI',
+        '07:00 | SAVER FARE', 'Akasa Air QP - 1111', 'Mumbai BOM', 'Sun, 06 Dec 2026 07:00', 'Chatrapati Shivaji Airport', 'Terminal: T-2',
+        '— 2h 25m —', 'Economy', 'DEL New Delhi', 'Sun, 06 Dec 2026', '09:25', 'Indira Gandhi Airport', 'Terminal: T-1', 'Cabin Baggage: 7 Kgs', 'G57'],
+      new Date('2026-11-25T04:00:00Z'),
+    );
+    expect(d.flightNumber).toBe('QP1111');
+    expect(d.terminal).toBe('T2');
   });
 });
 
