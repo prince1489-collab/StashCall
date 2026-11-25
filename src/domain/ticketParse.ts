@@ -177,6 +177,8 @@ function columnFlights(text: string, today: Date): FlightDetails[] | undefined {
   const numbers: { value: string; index: number }[] = [];
   for (const m of text.matchAll(/\b([A-Z]{2}|[A-Z]\d|\d[A-Z])(?:\s?-\s?|\s?)(\d{2,4})\b/g)) {
     if (/^(AM|PM|NO|TO|OF|ON|AT|IN|BY)$/.test(m[1])) continue;
+    // "(A321)" is the aircraft: codes with a digit only for known airlines.
+    if (/\d/.test(m[1]) && !DIGIT_AIRLINES.has(m[1])) continue;
     const value = `${m[1]}${m[2]}`;
     if (!numbers.some((n) => n.value === value)) numbers.push({ value, index: m.index });
   }
