@@ -242,6 +242,9 @@ describe('IndiGo booking tables', () => {
     expect(d.returnFlight?.departure).toBe('2026-12-08T13:20');
     expect(d.returnFlight?.flightNumber).toBe('6E7414');
     expect(d.returnFlight?.from?.code).toBe('PGH');
+    // T1 is where it lands in Delhi, not where it leaves Pantnagar.
+    expect(d.terminal).toBe('T1');
+    expect(d.returnFlight?.terminal).toBeUndefined();
     expect(suggestTripName(d)).toBe('Pantnagar in December');
   });
 
@@ -260,6 +263,45 @@ describe('IndiGo booking tables', () => {
     expect(d.from?.code).toBe('UDR');
     expect(d.to?.code).toBe('DEL');
     expect(d.returnFlight?.departure).toBe('2026-12-08T18:00');
+  });
+});
+
+describe('IndiGo tables read column by column', () => {
+  // What Mahiman's phone actually read from Bajrang's Delhi–Pantnagar
+  // booking: each column of the table in turn, not row by row.
+  const blocks: string[] = ["CONFIRMED", "Local Time.", "IndiGo Passenger - 1/2", "*Booking Date reflects in UTC (Universal Time Coordinated), all other timings mentioned are as per", "IndiGo Flight(s)", "Date", "06 Dec\n26", "Date", "08 Dec\n26", "From", "IndiGo Flight(s)", "(Terminal)", "Delhi (T1)", "Status", "From", "(Terminal)", "Pantnagar", "Passenger name", "Mr. Bajrang singh\nRathore", "CONFIRMED", "Seats and Additional Services", "Local Time.", "30 Oct 26 11:12:20 (UTC)", "IndiGo Flight(s)", "IndiGo Passenger - 2/2", "Remove", "6A", "Departs", "12:00", "13:20", "Mr. Bajrang singh Rathore", "Departs", "Flight", "Number", "(Aircraft", "type)", "6E7415", "(ATR)", "Flight", "Number", "(Aircraft", "type)", "Mr. Bajrang singh Rathore", "6E7414", "(ATR)", "DEL → PGH", "Check-in now", "Seat Services Purchased", "AGAI, Express Check\nIn,VCSW", "Date of Booking*", "Check-", "in/Bag", "drop", "closes", "11:00", "Check-", "in/Bag", "drop", "closes", "30 Oct 26 11:12:20 (UTC)", "12:20", "Approved", "PGH", "Check-in now", "To", "Flight Status", "(Terminal)", "Pantnagar", "To", "(Terminal)", "Delhi (T1)", "DEL", "Arrives Via", "13:00", "Approved", "*Booking Date reflects in UTC (Universal Time Coordinated), all other timings mentioned are as per", "Seat Services Purchased", "Arrives Via", "14:15", "Payment Status", "951", "Flight Status", "Close"];
+
+  it('lines the columns back up into flights', () => {
+    const d = parseTicketText(blocks, new Date('2026-11-25T04:00:00Z'));
+    expect(d.departure).toBe('2026-12-06T12:00');
+    expect(d.flightNumber).toBe('6E7415');
+    expect(d.from?.code).toBe('DEL');
+    expect(d.to?.code).toBe('PGH');
+    expect(d.terminal).toBe('T1');
+    expect(d.returnFlight?.departure).toBe('2026-12-08T13:20');
+    expect(d.returnFlight?.flightNumber).toBe('6E7414');
+    expect(d.returnFlight?.from?.code).toBe('PGH');
+    expect(d.returnFlight?.to?.code).toBe('DEL');
+    expect(d.returnFlight?.terminal).toBeUndefined();
+  });
+});
+
+describe('Yatra e-tickets', () => {
+  it('reads the flight and its departure terminal', () => {
+    const d = parseTicketText(
+      [
+        'E-Ticket booked with', 'yatra', 'Booking Confirmed', 'Booking ID: 441179544014542062933',
+        'Booked on: Mon, 23 Nov 2026 18:52:26', 'Departure Flight', 'New Delhi to Mumbai | Tue, 08 Dec 2026', 'PNR Number : DC9JFW',
+        '17:45 | FLEXI PLUS', 'IndiGo 6E - 328', 'New Delhi DEL', 'Tue, 08 Dec 2026 17:45', 'Indira Gandhi Airport', 'Terminal: T-1',
+        '— 2h 25m —', 'Economy', 'BOM Mumbai', 'Tue, 08 Dec 2026', '20:10', 'Chatrapati Shivaji Airport', 'Terminal: T-2',
+        'Mr. Mahiman singh Rathore (ADT)', 'DEL-BOM',
+      ],
+      new Date('2026-11-25T04:00:00Z'),
+    );
+    expect(d.departure).toBe('2026-12-08T17:45');
+    expect(d.from?.code).toBe('DEL');
+    expect(d.to?.code).toBe('BOM');
+    expect(d.terminal).toBe('T1');
   });
 });
 

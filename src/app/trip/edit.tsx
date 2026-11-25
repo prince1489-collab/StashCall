@@ -10,7 +10,7 @@ import { draftFromTicket, joinLegs, flightLeg, isReturnOf } from '../../domain/t
 import { describeTicket, hasTripDetails, type TicketDetails } from '../../domain/ticketParse';
 import { buildTimeline, defaultFlight } from '../../domain/timeline';
 import { autoTripName, isAutoName } from '../../domain/trips';
-import { namedOn, sortJourneys } from '../../domain/journeys';
+import { journeyFlights, namedOn, sortJourneys } from '../../domain/journeys';
 import { AIRPORTS } from '../../domain/airports';
 import type { FlightLeg, HotelCheckout, Ticket, Trip } from '../../domain/types';
 import { deletePhoto, pickTickets } from '../../storage/photos';
@@ -139,12 +139,22 @@ export default function EditTrip() {
    * flights joined with every leg read on this screen so far (Udaipur → Delhi,
    * then Delhi → Pantnagar).
    */
+  /**
+   * The saved flights, unless a ticket just read puts one of their flights
+   * the other way: a misread left Bajrang's 6E2008 out as his flight home.
+   */
+  const cleanBase = (pid: string, k: 'flight' | 'returnFlight') => {
+    const base = baseFor(pid, k);
+    const other = readLegs.current[k === 'flight' ? 'returnFlight' : 'flight'];
+    const numbers = new Set(other.flatMap(journeyFlights).map((f) => f.flightNumber).filter(Boolean));
+    return base && journeyFlights(base).some((f) => f.flightNumber && numbers.has(f.flightNumber)) ? undefined : base;
+  };
   const read = (pid: string, k: 'flight' | 'returnFlight', leg?: FlightLeg): FlightLeg => {
     if (leg) readLegs.current[k].push(leg);
     const legs = readLegs.current[k];
-    const journey = legs.reduce<FlightLeg | null | undefined>((had, l) => joinLegs(had, l), baseFor(pid, k))!;
+    const journey = legs.reduce<FlightLeg | null | undefined>((had, l) => joinLegs(had, l), cleanBase(pid, k))!;
     // Joined onto a flight that was already there: let the user undo that.
-    if (leg && baseFor(pid, k)) {
+    if (leg && cleanBase(pid, k)) {
       const alone = legs.reduce<FlightLeg | undefined>((had, l) => joinLegs(had, l), undefined)!;
       if (JSON.stringify(alone) !== JSON.stringify(journey)) setJoined((j) => ({ ...j, [k]: true }));
     }
@@ -312,14 +322,15 @@ export default function EditTrip() {
     setReadNote(`Read ${useful.length} screenshots: ${parts.join(', ')}.${between} Check the times before saving.`);
   };
 
-  /** In person mode, a ticket that names only one person goes on their plan. */
+  /**
+   * In person mode, a ticket that names only someone else: offer to put it
+   * on their plan. Not done unasked, since family often share one booking.
+   */
+  const [namedPerson, setNamedPerson] = useState<{ id: string; name: string } | null>(null);
   const followPassenger = (text: string | undefined) => {
     if (!personMode) return;
     const named = namedOn(text, travellers(currentTrip!, data.owners));
-    if (named.length === 1 && named[0].id !== personId) {
-      setPersonId(named[0].id);
-      setReadNote((n) => `${n ?? ''} The ticket names ${named[0].name}, so it's on ${named[0].name}'s plan.`.trim());
-    }
+    setNamedPerson(named.length === 1 && named[0].id !== personId ? { id: named[0].id, name: named[0].name } : null);
   };
 
   const fillFromScreenshot = async () => {
@@ -479,6 +490,18 @@ export default function EditTrip() {
           {readNote ??
             'Add your bookings one at a time or all at once. StashCall reads them on your phone, works out the way there and the way home, connections included, and keeps them with the trip for everyone on it.'}
         </Text>
+        {namedPerson && namedPerson.id !== personId ? (
+          <Text
+            style={styles.textLink}
+            onPress={() => {
+              setPersonId(namedPerson.id);
+              setNamedPerson(null);
+            }}
+            accessibilityRole="button"
+          >
+            This ticket names {namedPerson.name}. Put these flights on {namedPerson.name}'s plan instead?
+          </Text>
+        ) : null}
         {joined.flight || joined.returnFlight ? (
           <Text style={styles.textLink} onPress={keepOnlyRead} accessibilityRole="button">
             {joined.flight && joined.returnFlight ? 'Joined to the flights that were already there' : joined.flight ? 'Joined to the flight that was already there' : 'Joined to the flight home that was already there'}. Not
