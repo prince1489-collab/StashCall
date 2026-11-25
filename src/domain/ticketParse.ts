@@ -203,6 +203,8 @@ function columnFlights(text: string, today: Date): FlightDetails[] | undefined {
   };
   const from = column(/^\s*From\b/im, /\bdepart/i);
   const to = column(/^\s*To\s*$/im, /\barriv/i);
+  // Only a real table: From and To headings with a city under each.
+  if (from.length === 0 || to.length === 0) return undefined;
 
   return numbers.map((num, i) => {
     const f: FlightDetails = {
