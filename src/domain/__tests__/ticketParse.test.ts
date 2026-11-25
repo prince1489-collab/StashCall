@@ -264,17 +264,28 @@ describe('IndiGo booking tables', () => {
 });
 
 describe('two bookings for one journey', () => {
-  it('keeps the first flight of the day each way', async () => {
-    const { firstLegOfDay } = await import('../ticketDraft');
+  it('joins them into one journey with a connection', async () => {
+    const { joinLegs } = await import('../ticketDraft');
     const { defaultFlight } = await import('../timeline');
-    const udaipur = defaultFlight('2026-12-06T08:55', 'Asia/Kolkata', false);
-    const delhi = defaultFlight('2026-12-06T12:00', 'Asia/Kolkata', false);
-    expect(firstLegOfDay(udaipur, delhi)).toBe(udaipur);
-    expect(firstLegOfDay(delhi, udaipur)).toBe(udaipur);
-    expect(firstLegOfDay(undefined, delhi)).toBe(delhi);
+    const udaipur = { ...defaultFlight('2026-12-06T08:55', 'Asia/Kolkata', false), airport: 'UDR', destination: 'DEL', flightNumber: '6E2008' };
+    const delhi = { ...defaultFlight('2026-12-06T12:00', 'Asia/Kolkata', false), airport: 'DEL', destination: 'PGH', flightNumber: '6E7415', terminal: 'T1' };
+    for (const j of [joinLegs(udaipur, delhi), joinLegs(delhi, udaipur)]) {
+      expect(j.departure).toBe('2026-12-06T08:55');
+      expect(j.airport).toBe('UDR');
+      expect(j.destination).toBe('PGH');
+      expect(j.connections).toEqual([
+        { departure: '2026-12-06T12:00', timeZone: 'Asia/Kolkata', flightNumber: '6E7415', airport: 'DEL', destination: 'PGH', terminal: 'T1' },
+      ]);
+    }
+    // A whole journey joining a flight before it keeps each flight's own stop.
+    const toPgh = { ...delhi, destination: 'DXB', connections: [{ departure: '2026-12-06T18:00', timeZone: 'Asia/Kolkata', airport: 'PGH', destination: 'DXB' }] };
+    expect(joinLegs(udaipur, toPgh).connections?.map((c) => [c.airport, c.destination])).toEqual([['DEL', 'PGH'], ['PGH', 'DXB']]);
+    // Sharing the same booking twice adds nothing.
+    expect(joinLegs(joinLegs(udaipur, delhi), delhi).connections).toHaveLength(1);
+    expect(joinLegs(undefined, delhi)).toBe(delhi);
     // A different trip altogether: the new flight replaces it.
     const later = defaultFlight('2027-02-10T09:00', 'Asia/Kolkata', true);
-    expect(firstLegOfDay(udaipur, later)).toBe(later);
+    expect(joinLegs(udaipur, later)).toBe(later);
   });
 });
 
@@ -283,5 +294,42 @@ describe('cities and codes', () => {
     const d = parseTicketText(['London (LGW) to Paris (ORY)', 'Flight AF1234', '5 Feb 2027', 'Departs 09:40'], today);
     expect(d.from?.code).toBe('LGW');
     expect(d.to?.code).toBe('ORY');
+  });
+});
+
+describe('connections', () => {
+  it('keeps the connecting flights each way, with terminals', () => {
+    const d = parseTicketText(
+      [
+        'EK2 LHR DXB', 'Departs 5 Feb 2027 09:40 Terminal 3',
+        'EK500 DXB BOM', 'Departs 5 Feb 2027 22:10',
+        'EK501 BOM DXB', 'Departs 19 Feb 2027 04:30',
+        'EK1 DXB LHR', 'Departs 19 Feb 2027 08:00',
+      ],
+      today,
+    );
+    expect(d.terminal).toBe('T3');
+    expect(d.connections?.map((c) => [c.flightNumber, c.from?.code, c.to?.code, c.departure])).toEqual([['EK500', 'DXB', 'BOM', '2027-02-05T22:10']]);
+    expect(d.returnFlight?.to?.code).toBe('LHR');
+    expect(d.returnFlight?.connections?.map((c) => c.flightNumber)).toEqual(['EK1']);
+  });
+
+  it('plans a reminder before each connection', async () => {
+    const { draftFromTicket } = await import('../ticketDraft');
+    const { buildTimeline } = await import('../timeline');
+    const { planReminders } = await import('../../reminders/plan');
+    const d = parseTicketText(['6E2008 UDR DEL', 'Departs 6 Dec 2026 08:55', '6E7415 DEL PGH (T1)', 'Departs 6 Dec 2026 12:00'], today);
+    const flight = draftFromTicket(d, 'Asia/Kolkata').flight!;
+    expect(flight.destination).toBe('PGH');
+    const steps = buildTimeline({ flight });
+    const next = steps.find((s) => s.kind === 'connection')!;
+    expect(next.localTime).toBe('12:00');
+    expect(next.detail).toBe('6E7415 to Pantnagar from T1');
+    const trip = { id: 't', name: 'Pantnagar', flight, itemIds: [], ticked: {}, createdAt: '' };
+    const r = planReminders(trip, [], new Date('2026-12-01T00:00:00Z')).find((x) => x.kind === 'connection')!;
+    expect(r.title).toBe('Next flight at 12:00');
+    expect(r.body).toContain('6E7415 to Pantnagar from T1');
+    // 90 minutes before: 10:30 India time.
+    expect(r.at.toISOString()).toBe('2026-12-06T05:00:00.000Z');
   });
 });
