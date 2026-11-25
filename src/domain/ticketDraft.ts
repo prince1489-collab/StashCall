@@ -1,5 +1,6 @@
 import { DEFAULTS } from './defaults';
 import { suggestTripName, type FlightDetails, type TicketDetails } from './ticketParse';
+import { zonedToInstant } from './time';
 import { defaultFlight } from './timeline';
 import type { FlightLeg, HotelCheckout, Trip } from './types';
 
@@ -68,4 +69,16 @@ export function joinsTrip(trip: Trip, d: TicketDetails): boolean {
   if (d.to && f.destination && d.to.code === f.destination) return true;
   const day = (x: string) => Date.parse(`${x.slice(0, 10)}T00:00Z`);
   return Math.abs(day(d.departure) - day(f.departure)) <= 86400000;
+}
+
+/**
+ * Two bookings for one journey, like Udaipur → Delhi and Delhi → Pantnagar
+ * on the same day: the day is planned from the first flight, so keep the
+ * earlier leg. Legs more than a day apart aren't one journey: the new one wins.
+ */
+export function firstLegOfDay(had: FlightLeg | null | undefined, read: FlightLeg): FlightLeg {
+  if (!had) return read;
+  const a = zonedToInstant(had.departure, had.timeZone).getTime();
+  const b = zonedToInstant(read.departure, read.timeZone).getTime();
+  return Math.abs(a - b) <= 24 * 3600 * 1000 && a < b ? had : read;
 }

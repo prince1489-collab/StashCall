@@ -6,7 +6,7 @@ import { DEFAULTS } from '../../domain/defaults';
 import { savedItems } from '../../domain/household';
 import { setPersonFlights, travellers, tripFor } from '../../domain/people';
 import { addTickets } from '../../domain/tickets';
-import { draftFromTicket, flightLeg, isReturnOf } from '../../domain/ticketDraft';
+import { draftFromTicket, firstLegOfDay, flightLeg, isReturnOf } from '../../domain/ticketDraft';
 import { describeTicket, hasTripDetails, type TicketDetails } from '../../domain/ticketParse';
 import { buildTimeline, defaultFlight } from '../../domain/timeline';
 import type { FlightLeg, HotelCheckout, Ticket, Trip } from '../../domain/types';
@@ -249,11 +249,13 @@ export default function EditTrip() {
     }
     const tripId = currentTrip.id;
     saved.current = true;
+    // A second booking for the same journey (Udaipur → Delhi, then Delhi →
+    // Pantnagar) keeps the earlier flight each way: the day starts there.
+    const own = currentTrip.personFlights?.[person.id];
+    const out = hasFlight ? (fromTicket.current.flight ? firstLegOfDay(own?.flight, flight) : flight) : undefined;
+    const home = hasReturn ? (fromTicket.current.returnFlight ? firstLegOfDay(own?.returnFlight, returnFlight) : returnFlight) : undefined;
     await update((d) => {
-      let next = setPersonFlights(d, tripId, person.id, {
-        flight: hasFlight ? flight : undefined,
-        returnFlight: hasReturn ? returnFlight : undefined,
-      });
+      let next = setPersonFlights(d, tripId, person.id, { flight: out, returnFlight: home });
       // Their own flights mean they're going.
       const t = next.trips.find((x) => x.id === tripId);
       if (t?.travellerIds && !t.travellerIds.includes(person.id))
