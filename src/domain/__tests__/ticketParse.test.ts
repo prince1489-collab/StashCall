@@ -371,6 +371,17 @@ describe('two bookings for one journey', () => {
     expect(again.flightNumber).toBe('6E2008');
     expect(again.bufferMinutes).toBe(150);
     expect(again.connections?.map((c) => c.flightNumber)).toEqual(['6E7415']);
+    // A reading that misses the number ("QP -11n" in the OCR) still clears a
+    // saved one that was never a flight, and keeps a real one.
+    const akasa = { ...defaultFlight('2026-12-06T07:00', 'Asia/Kolkata', false), airport: 'BOM', destination: 'DEL' };
+    expect(joinLegs({ ...akasa, flightNumber: 'G57' }, akasa).flightNumber).toBeUndefined();
+    expect(joinLegs({ ...akasa, flightNumber: 'QP1111' }, akasa).flightNumber).toBe('QP1111');
+    // A connection read again without its terminal keeps the saved one.
+    const noTerminal = joinLegs(udaipur, { ...delhi, terminal: undefined });
+    expect(joinLegs(joinLegs(udaipur, delhi), { ...delhi, terminal: undefined, flightNumber: '6E7416' }).connections).toEqual([
+      expect.objectContaining({ flightNumber: '6E7416', terminal: 'T1' }),
+    ]);
+    expect(noTerminal.connections?.[0].terminal).toBeUndefined();
     // A flight with no airports (the form's made-up one) is replaced, not joined.
     const blank = defaultFlight('2026-12-06T17:33', 'Asia/Kolkata', true);
     const bom = { ...defaultFlight('2026-12-06T07:00', 'Asia/Kolkata', false), airport: 'BOM', destination: 'DEL' };

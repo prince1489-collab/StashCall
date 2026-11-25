@@ -122,6 +122,12 @@ const local = (day: Day, time: string): LocalDateTime => `${day.y}-${pad(day.m)}
 /** Times that are about something other than take-off. */
 const NOT_DEPARTURE = /board|gate|arriv|land|check[\s-]?in|duration|clos/i;
 
+/** Whether a saved number is shaped like a flight: "6E328", "QP1111", not "G57". */
+export function isFlightNumber(s: string): boolean {
+  const m = /^([A-Z]{2}|[A-Z]\d|\d[A-Z])\d{1,4}$/.exec(s.replace(/[\s-]/g, '').toUpperCase());
+  return !!m && !(/\d/.test(m[1]) && !DIGIT_AIRLINES.has(m[1]));
+}
+
 function findFlightNumber(text: string): string | undefined {
   const all = [...text.matchAll(/\b([A-Z]{2}|[A-Z]\d|\d[A-Z])(?:\s?-\s?|\s?)(\d{1,4})\b/g)].filter(
     // Codes with a digit ("6E" IndiGo) only from the known list: "G57" is not a flight.

@@ -1,5 +1,5 @@
 import { DEFAULTS } from './defaults';
-import { suggestTripName, type FlightDetails, type TicketDetails } from './ticketParse';
+import { isFlightNumber, suggestTripName, type FlightDetails, type TicketDetails } from './ticketParse';
 import { zonedToInstant } from './time';
 import { defaultFlight } from './timeline';
 import type { Connection, FlightLeg, HotelCheckout, Trip } from './types';
@@ -110,6 +110,10 @@ function asConnection(f: FlightLeg): Connection {
   };
 }
 
+/** Only the fields that hold a value. */
+const defined = <T extends object>(o: T): Partial<T> =>
+  Object.fromEntries(Object.entries(o).filter(([, v]) => v !== undefined && v !== '')) as Partial<T>;
+
 /** Every departure on a journey, as instants. */
 const departures = (f: FlightLeg) => [instant(f), ...(f.connections ?? []).map(instant)];
 
@@ -136,10 +140,12 @@ export function joinLegs(had: FlightLeg | null | undefined, read: FlightLeg): Fl
   const same = instant(had) === instant(read);
   // The same first flight read again: keep the user's settings for it
   // (time to the airport, buffer), but take what the ticket says now.
+  // A saved number that isn't a flight at all ("G57", a seat read as one
+  // before) goes, even when this reading has no number to put in its place.
   const lead = same
     ? {
         ...had,
-        ...(read.flightNumber && { flightNumber: read.flightNumber }),
+        flightNumber: read.flightNumber ?? (had.flightNumber && isFlightNumber(had.flightNumber) ? had.flightNumber : undefined),
         ...(read.terminal && { terminal: read.terminal }),
         ...(read.airport && { airport: read.airport }),
       }
@@ -149,10 +155,16 @@ export function joinLegs(had: FlightLeg | null | undefined, read: FlightLeg): Fl
   // Every later flight; where both bookings have one, the newer reading wins.
   const later = (f: FlightLeg) => [...(f === first ? [] : [asConnection(f)]), ...(f.connections ?? [])];
   const all = [...later(first === lead ? read : first), ...later(second === read ? had : second)];
-  const seen = new Set<number>([instant(first)]);
-  const connections = all
-    .filter((c) => (seen.has(instant(c)) ? false : (seen.add(instant(c)), true)))
-    .sort((a, b) => instant(a) - instant(b));
+  // The same flight on both: the newer reading's details win, but a detail
+  // it didn't catch (a terminal, say) is kept from the older one.
+  const byTime = new Map<number, Connection>();
+  for (const c of all) {
+    const t = instant(c);
+    if (t === instant(first)) continue;
+    const newer = byTime.get(t);
+    byTime.set(t, newer ? { ...c, ...defined(newer) } : c);
+  }
+  const connections = [...byTime.values()].sort((a, b) => instant(a) - instant(b));
   const last = connections[connections.length - 1];
   return {
     ...first,
