@@ -10,9 +10,10 @@ import { draftFromTicket, joinLegs, flightLeg, isReturnOf } from '../../domain/t
 import { describeTicket, hasTripDetails, type TicketDetails } from '../../domain/ticketParse';
 import { buildTimeline, defaultFlight } from '../../domain/timeline';
 import { autoTripName, isAutoName } from '../../domain/trips';
+import { namedOn, sortJourneys } from '../../domain/journeys';
 import { AIRPORTS } from '../../domain/airports';
 import type { FlightLeg, HotelCheckout, Ticket, Trip } from '../../domain/types';
-import { deletePhoto, pickTicket } from '../../storage/photos';
+import { deletePhoto, pickTickets } from '../../storage/photos';
 import { newId } from '../../storage/store';
 import { readProblem, readTicket } from '../../tickets/readTicket';
 import { useReminders } from '../../reminders/Reminders';
@@ -257,20 +258,83 @@ export default function EditTrip() {
     const shared = fromJson<Ticket[]>(params.tickets);
     if (!shared?.length) return;
     setAdded(shared);
-    applyTicket(fromJson<TicketDetails>(params.details) ?? {}, params.problem);
+    const details = fromJson<TicketDetails | TicketDetails[]>(params.details);
+    applyTickets(Array.isArray(details) ? details : [details ?? {}], params.problem);
     if (params.text) setReadText(params.text);
+    followPassenger(params.text);
   }, []); // eslint-disable-line react-hooks/exhaustive-deps
 
+  /**
+   * Several screenshots at once, in any order: every flight on them is
+   * sorted into the way there and the way home.
+   */
+  const applyTickets = (list: TicketDetails[], problem?: string) => {
+    const useful = list.filter(hasTripDetails);
+    if (useful.length <= 1) return applyTicket(useful[0] ?? list[0] ?? {}, problem);
+    const s = sortJourneys(useful, deviceZone());
+    // Only the way home, for a trip that already has its way there.
+    const outbound = hasFlight && (existing?.flight || flightTouched.current) ? flight : undefined;
+    const one = s.flight;
+    if (one && !s.returnFlight && outbound) {
+      const airport = (code?: string) => (code ? AIRPORTS[code] : undefined);
+      if (isReturnOf(outbound, { departure: one.departure, from: airport(one.airport), to: airport(one.destination) })) {
+        s.returnFlight = one;
+        s.flight = undefined;
+      }
+    }
+    const withCheckout = useful.find((d) => d.checkout);
+    setName((n) => n.trim() || draftFromTicket(useful[0], deviceZone()).name);
+    if (s.flight) {
+      fromTicket.current.flight = true;
+      flightTouched.current = true;
+      setHasFlight(true);
+      setFlight(read(personId, 'flight', s.flight));
+    }
+    if (withCheckout) {
+      setHasCheckout(true);
+      setCheckout(draftFromTicket(withCheckout, deviceZone()).checkout!);
+    }
+    if (s.returnFlight) {
+      fromTicket.current.returnFlight = true;
+      setHasReturn(true);
+      setReturnFlight(read(personId, 'returnFlight', s.returnFlight));
+    }
+    const route = (f: FlightLeg) =>
+      [f.airport, ...(f.connections ?? []).map((c) => c.airport), f.destination].filter((x, i, a) => x && x !== a[i - 1]).join(' → ');
+    const parts = [
+      s.flight && `there ${route(s.flight)}`,
+      s.returnFlight && `home ${route(s.returnFlight)}`,
+    ].filter(Boolean);
+    const between = s.between.length > 0 ? ` ${s.between.length === 1 ? 'One flight' : `${s.between.length} flights`} in between can't be planned yet.` : '';
+    setReadNote(`Read ${useful.length} screenshots: ${parts.join(', ')}.${between} Check the times before saving.`);
+  };
+
+  /** In person mode, a ticket that names only one person goes on their plan. */
+  const followPassenger = (text: string | undefined) => {
+    if (!personMode) return;
+    const named = namedOn(text, travellers(currentTrip!, data.owners));
+    if (named.length === 1 && named[0].id !== personId) {
+      setPersonId(named[0].id);
+      setReadNote((n) => `${n ?? ''} The ticket names ${named[0].name}, so it's on ${named[0].name}'s plan.`.trim());
+    }
+  };
+
   const fillFromScreenshot = async () => {
-    const uri = await pickTicket();
-    if (!uri) return;
-    setAdded((a) => [...a, { id: newId(), uri, addedAt: new Date().toISOString() }]);
+    const uris = await pickTickets();
+    if (uris.length === 0) return;
+    setAdded((a) => [...a, ...uris.map((uri) => ({ id: newId(), uri, addedAt: new Date().toISOString() }))]);
     setReading(true);
     try {
-      const r = await readTicket(uri);
-      applyTicket(r.details, readProblem(r));
-      setReadText(r.text ?? null);
+      const readings = [];
+      for (const uri of uris) readings.push(await readTicket(uri));
+      applyTickets(
+        readings.map((r) => r.details),
+        readings.map(readProblem).find(Boolean),
+      );
+      const text = readings.map((r) => r.text).filter(Boolean).join('\n\n—\n\n');
+      setReadText(text || null);
       setShowText(false);
+      followPassenger(text);
     } finally {
       setReading(false);
     }
@@ -401,16 +465,16 @@ export default function EditTrip() {
         {reading ? (
           <View style={styles.readingRow}>
             <ActivityIndicator color={colors.accent} />
-            <Text style={styles.fillHint}>Reading your screenshot… The first time can take up to a minute.</Text>
+            <Text style={styles.fillHint}>Reading your screenshots… The first time can take up to a minute.</Text>
           </View>
         ) : (
           <Text style={styles.fillLink} onPress={fillFromScreenshot} accessibilityRole="button">
-            Fill in from a ticket screenshot
+            Fill in from ticket screenshots
           </Text>
         )}
         <Text style={styles.fillHint}>
           {readNote ??
-            'Pick a booking email, boarding pass or hotel booking. StashCall reads it on your phone and keeps it with the trip.'}
+            'Pick every booking for the trip at once: flights, boarding passes, hotel. StashCall reads them on your phone, sorts the flights into the way there and the way home, and keeps them with the trip.'}
         </Text>
         {joined.flight || joined.returnFlight ? (
           <Text style={styles.textLink} onPress={keepOnlyRead} accessibilityRole="button">

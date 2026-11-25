@@ -61,16 +61,16 @@ export function ShareInbox() {
         return;
       }
 
-      let details: TicketDetails = {};
-      let problem: string | undefined;
-      let text: string | undefined;
-      for (const t of kept) {
-        const r = await readTicket(t.uri);
-        details = r.details;
-        problem = readProblem(r);
-        text = r.text;
-        if (hasTripDetails(details)) break;
-      }
+      // Read them all: the trip form sorts several bookings into the way
+      // there and the way home. The first one with a flight or stay decides
+      // where they go.
+      const readings = [];
+      for (const t of kept) readings.push(await readTicket(t.uri));
+      const all = readings.map((r) => r.details).filter(hasTripDetails);
+      const details: TicketDetails = all[0] ?? readings[0]?.details ?? {};
+      const problem = all.length > 0 ? undefined : readings.map(readProblem).find(Boolean);
+      const text = readings.map((r) => r.text).filter(Boolean).join('\n\n—\n\n') || undefined;
+      const detailsParam = JSON.stringify(all.length > 1 ? all : details);
 
       // The flight home for the current trip, on its own or in the whole
       // round-trip booking: add it to that trip.
@@ -79,7 +79,7 @@ export function ShareInbox() {
       if (currentTrip?.flight && !currentTrip.returnFlight && (homeOnly || fullBooking)) {
         router.push({
           pathname: '/trip/edit',
-          params: { tickets: JSON.stringify(kept), details: JSON.stringify(details), ...(text && { text }) },
+          params: { tickets: JSON.stringify(kept), details: detailsParam, ...(text && { text }) },
         });
         return;
       }
@@ -89,7 +89,7 @@ export function ShareInbox() {
       if (currentTrip && data.owners.length > 1 && joinsTrip(currentTrip, details)) {
         router.push({
           pathname: '/trip/edit',
-          params: { person: 'ask', tickets: JSON.stringify(kept), details: JSON.stringify(details), ...(text && { text }) },
+          params: { person: 'ask', tickets: JSON.stringify(kept), details: detailsParam, ...(text && { text }) },
         });
         return;
       }
@@ -104,7 +104,7 @@ export function ShareInbox() {
           params: {
             new: '1',
             tickets: JSON.stringify(kept),
-            details: JSON.stringify(details),
+            details: detailsParam,
             ...(problem && { problem }),
             ...(text && { text }),
           },
