@@ -145,19 +145,24 @@ export default function EditTrip() {
     // Joined onto a flight that was already there: let the user undo that.
     if (leg && baseFor(pid, k)) {
       const alone = legs.reduce<FlightLeg | undefined>((had, l) => joinLegs(had, l), undefined)!;
-      if (JSON.stringify(alone) !== JSON.stringify(journey)) setJoined(k);
+      if (JSON.stringify(alone) !== JSON.stringify(journey)) setJoined((j) => ({ ...j, [k]: true }));
     }
     return journey;
   };
   /** Flights that ignore what was saved before and keep only what was read here. */
   const onlyRead = useRef({ flight: false, returnFlight: false });
-  const [joined, setJoined] = useState<'flight' | 'returnFlight' | null>(null);
+  // Which directions a ticket joined onto flights already there.
+  const [joined, setJoined] = useState<{ flight?: boolean; returnFlight?: boolean }>({});
   const keepOnlyRead = () => {
-    if (!joined) return;
-    onlyRead.current[joined] = true;
-    if (joined === 'flight') setFlight(read(personId, 'flight'));
-    else setReturnFlight(read(personId, 'returnFlight'));
-    setJoined(null);
+    if (joined.flight) {
+      onlyRead.current.flight = true;
+      setFlight(read(personId, 'flight'));
+    }
+    if (joined.returnFlight) {
+      onlyRead.current.returnFlight = true;
+      setReturnFlight(read(personId, 'returnFlight'));
+    }
+    setJoined({});
   };
   const addedRef = useRef(added);
   addedRef.current = added;
@@ -407,9 +412,9 @@ export default function EditTrip() {
           {readNote ??
             'Pick a booking email, boarding pass or hotel booking. StashCall reads it on your phone and keeps it with the trip.'}
         </Text>
-        {joined ? (
+        {joined.flight || joined.returnFlight ? (
           <Text style={styles.textLink} onPress={keepOnlyRead} accessibilityRole="button">
-            {joined === 'flight' ? 'Joined to the flight that was already there' : 'Joined to the flight home that was already there'}. Not
+            {joined.flight && joined.returnFlight ? 'Joined to the flights that were already there' : joined.flight ? 'Joined to the flight that was already there' : 'Joined to the flight home that was already there'}. Not
             one journey? Tap to use only this ticket.
           </Text>
         ) : null}
