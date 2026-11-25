@@ -133,10 +133,22 @@ function connects(first: FlightLeg, second: FlightLeg): boolean {
  */
 export function joinLegs(had: FlightLeg | null | undefined, read: FlightLeg): FlightLeg {
   if (!had || Math.abs(instant(had) - instant(read)) > 24 * 3600 * 1000) return read;
-  const [first, second] = instant(had) <= instant(read) ? [had, read] : [read, had];
+  const same = instant(had) === instant(read);
+  // The same first flight read again: keep the user's settings for it
+  // (time to the airport, buffer), but take what the ticket says now.
+  const lead = same
+    ? {
+        ...had,
+        ...(read.flightNumber && { flightNumber: read.flightNumber }),
+        ...(read.terminal && { terminal: read.terminal }),
+        ...(read.airport && { airport: read.airport }),
+      }
+    : had;
+  const [first, second] = instant(had) <= instant(read) ? [lead, read] : [read, had];
   if (!connects(first, second)) return read;
-  const all = [...(first.connections ?? []), asConnection(second), ...(second.connections ?? [])];
-  // The same flight in both bookings counts once.
+  // Every later flight; where both bookings have one, the newer reading wins.
+  const later = (f: FlightLeg) => [...(f === first ? [] : [asConnection(f)]), ...(f.connections ?? [])];
+  const all = [...later(first === lead ? read : first), ...later(second === read ? had : second)];
   const seen = new Set<number>([instant(first)]);
   const connections = all
     .filter((c) => (seen.has(instant(c)) ? false : (seen.add(instant(c)), true)))

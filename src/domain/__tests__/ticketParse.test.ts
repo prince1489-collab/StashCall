@@ -364,6 +364,13 @@ describe('two bookings for one journey', () => {
     // A different trip altogether: the new flight replaces it.
     const later = defaultFlight('2027-02-10T09:00', 'Asia/Kolkata', true);
     expect(joinLegs(udaipur, later)).toBe(later);
+    // Reading a booking again updates what was saved: a fixed flight number
+    // replaces "G57", on the first flight and on a connection.
+    const saved = joinLegs({ ...udaipur, flightNumber: 'G57', bufferMinutes: 150 }, { ...delhi, flightNumber: undefined });
+    const again = joinLegs(joinLegs(saved, { ...udaipur }), delhi);
+    expect(again.flightNumber).toBe('6E2008');
+    expect(again.bufferMinutes).toBe(150);
+    expect(again.connections?.map((c) => c.flightNumber)).toEqual(['6E7415']);
     // A flight with no airports (the form's made-up one) is replaced, not joined.
     const blank = defaultFlight('2026-12-06T17:33', 'Asia/Kolkata', true);
     const bom = { ...defaultFlight('2026-12-06T07:00', 'Asia/Kolkata', false), airport: 'BOM', destination: 'DEL' };
