@@ -27,6 +27,28 @@ async function keep(uri: string, dir: Directory = photoDir()): Promise<string> {
   return dest.uri;
 }
 
+/** Picks one or more ticket screenshots, full size, kept in the app. Empty if cancelled. */
+export async function pickTickets(): Promise<string[]> {
+  const perm = await ImagePicker.requestMediaLibraryPermissionsAsync();
+  if (!perm.granted) return [];
+  const result = await ImagePicker.launchImageLibraryAsync({
+    mediaTypes: ['images'],
+    quality: 0.9,
+    allowsMultipleSelection: true,
+    selectionLimit: 10,
+  });
+  if (result.canceled) return [];
+  const kept: string[] = [];
+  for (const a of result.assets) {
+    try {
+      kept.push(await keepTicket(a.uri));
+    } catch {
+      // Skip one we couldn't copy; keep the rest.
+    }
+  }
+  return kept;
+}
+
 /** Copies a shared or picked ticket image into the app. */
 export async function keepTicket(uri: string): Promise<string> {
   return keep(uri, ticketDir());

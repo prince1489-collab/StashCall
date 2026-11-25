@@ -5,6 +5,7 @@ import { Pressable, ScrollView, Share, StyleSheet, Text, View } from 'react-nati
 import { travellers, tripFor } from '../../domain/people';
 import { tripChecklistText } from '../../domain/shareText';
 import { buildTimeline } from '../../domain/timeline';
+import { journeyFlights } from '../../domain/journeys';
 import { formatTripDays, pastTrips, tripSpan, upcomingTrips } from '../../domain/trips';
 import { stepItemNames } from '../../domain/tripItems';
 import type { Person, Trip } from '../../domain/types';
@@ -13,7 +14,6 @@ import { useAppData } from '../../state/AppData';
 import { useSync } from '../../sync/SyncProvider';
 import { BeforeYouGo } from '../../ui/BeforeYouGo';
 import { PrimaryButton, formatLocalDate } from '../../ui/Form';
-import { PlaneIcon } from '../../ui/Icons';
 import { ReminderStatus } from '../../ui/ReminderStatus';
 import { Tickets } from '../../ui/Tickets';
 import { Timeline } from '../../ui/Timeline';
@@ -187,7 +187,8 @@ function TripDetail({ trip }: { trip: Trip }) {
           </View>
         </View>
       ) : null}
-      {plan.flight ? <Pass trip={plan} /> : null}
+      {plan.flight ? <Journey label="Getting there" f={plan.flight} lead /> : null}
+      {plan.returnFlight ? <Journey label="Coming home" f={plan.returnFlight} /> : null}
       {person && going.length > 1 ? (
         <Text
           style={styles.share}
@@ -213,30 +214,29 @@ function TripDetail({ trip }: { trip: Trip }) {
   );
 }
 
-/** The boarding-pass card: where the journey starts and ends, with any stops. */
-function Pass({ trip }: { trip: Trip }) {
-  const f = trip.flight!;
-  const via = (f.connections ?? []).map((c) => c.airport).filter((x): x is string => !!x && x !== f.airport && x !== f.destination);
+/**
+ * One journey, however many flights it takes: the route on top, then each
+ * flight with its time, number and terminal.
+ */
+function Journey({ label, f, lead }: { label: string; f: NonNullable<Trip['flight']>; lead?: boolean }) {
+  const flights = journeyFlights(f);
   return (
-    <View style={styles.pass}>
-      <View>
-        <Text style={styles.code}>{f.airport ?? '—'}</Text>
-        <Text style={styles.passMeta}>
-          {formatLocalDate(f.departure)} · {f.departure.slice(11)}
-        </Text>
-      </View>
-      <View style={styles.routeCol}>
-        <View style={styles.route}>
-          <View style={styles.dash} />
-          <PlaneIcon color={colors.amber} size={20} />
-          <View style={styles.dash} />
+    <View style={[styles.journey, lead && styles.journeyLead]}>
+      <Text style={[styles.journeyLabel, lead && styles.onNavyMuted]}>
+        {label} · {formatLocalDate(f.departure)}
+      </Text>
+      <Text style={[styles.journeyRoute, lead && styles.onNavy]}>{route(f)}</Text>
+      {flights.map((x, i) => (
+        <View key={`${x.departure}-${i}`} style={styles.leg}>
+          <Text style={[styles.legTime, lead && styles.onNavy]}>{x.departure.slice(11)}</Text>
+          <Text style={[styles.legText, lead && styles.onNavy]}>
+            {[x.from && x.to ? `${x.from} → ${x.to}` : (x.from ?? x.to), x.flightNumber, x.terminal && `from ${x.terminal}`]
+              .filter(Boolean)
+              .join(' · ') || 'Flight'}
+            {i > 0 && x.departure.slice(0, 10) !== flights[0].departure.slice(0, 10) ? ` · ${formatLocalDate(x.departure)}` : ''}
+          </Text>
         </View>
-        {via.length > 0 ? <Text style={styles.passMeta}>via {[...new Set(via)].join(', ')}</Text> : null}
-      </View>
-      <View style={{ alignItems: 'flex-end' }}>
-        <Text style={styles.code}>{f.destination ?? '—'}</Text>
-        <Text style={styles.passMeta}>{trip.returnFlight ? `Home ${formatLocalDate(trip.returnFlight.departure)}` : 'One way'}</Text>
-      </View>
+      ))}
     </View>
   );
 }
@@ -283,7 +283,15 @@ const styles = StyleSheet.create({
   plans: { marginTop: space.m, gap: space.s },
   planChips: { flexDirection: 'row', flexWrap: 'wrap', gap: space.s },
   sectionHeading: { fontSize: 12, fontWeight: '600', letterSpacing: 0.8, textTransform: 'uppercase', color: colors.muted, marginTop: space.xl },
-  routeCol: { flex: 1, alignItems: 'center', gap: 2 },
+  journey: { backgroundColor: colors.card, borderRadius: 20, borderWidth: StyleSheet.hairlineWidth, borderColor: colors.border, padding: space.l, marginTop: space.m, gap: 6 },
+  journeyLead: { backgroundColor: colors.accent, borderColor: colors.accent },
+  journeyLabel: { fontSize: 12, fontWeight: '600', letterSpacing: 0.8, textTransform: 'uppercase', color: colors.muted },
+  journeyRoute: { fontSize: 26, fontFamily: fonts.display, color: colors.text, marginBottom: 2 },
+  leg: { flexDirection: 'row', gap: space.m, alignItems: 'baseline' },
+  legTime: { width: 48, fontSize: 15, fontFamily: fonts.bold, color: colors.text, fontVariant: ['tabular-nums'] },
+  legText: { flex: 1, fontSize: 14, color: colors.text },
+  onNavy: { color: '#fff' },
+  onNavyMuted: { color: colors.onAccentMuted },
   pick: { backgroundColor: colors.card, borderRadius: 14, borderWidth: StyleSheet.hairlineWidth, borderColor: colors.border, paddingHorizontal: space.m, paddingVertical: space.s, maxWidth: 180 },
   pickOn: { backgroundColor: colors.accent, borderColor: colors.accent },
   pickName: { fontSize: 14, fontFamily: fonts.bold, color: colors.text },
@@ -297,19 +305,6 @@ const styles = StyleSheet.create({
   title: { fontSize: 26, fontFamily: fonts.display, color: colors.text, flex: 1 },
   edit: { fontSize: 16, color: colors.accent, fontWeight: '600', padding: space.s },
   share: { fontSize: 16, color: colors.accent, fontWeight: '600', paddingVertical: space.m },
-  pass: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: space.m,
-    backgroundColor: colors.accent,
-    borderRadius: 20,
-    padding: space.l,
-    marginTop: space.m,
-  },
-  code: { color: '#fff', fontSize: 28, fontFamily: fonts.display },
-  passMeta: { color: colors.onAccentMuted, fontSize: 13 },
-  route: { flex: 1, flexDirection: 'row', alignItems: 'center', gap: space.xs },
-  dash: { flex: 1, borderTopWidth: 2, borderStyle: 'dashed', borderColor: 'rgba(255,255,255,0.35)' },
   note: { fontSize: 14, color: colors.muted, marginTop: space.xs },
   empty: { flex: 1, justifyContent: 'center', padding: space.xl, gap: space.l },
   emptyTitle: { fontSize: 24, fontFamily: fonts.display, color: colors.text },
