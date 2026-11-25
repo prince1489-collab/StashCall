@@ -47,10 +47,12 @@ const DAY_MS = 24 * 3600 * 1000;
 const at = (f: FlightLeg) => zonedToInstant(f.departure, f.timeZone).getTime();
 
 /** Each single flight a reading holds, outbound and home, connections included. */
-function singleFlights(d: TicketDetails): FlightDetails[] {
+function singleFlights(d: TicketDetails, booking: number): { f: FlightDetails; booking: number; home: boolean }[] {
   const out: FlightDetails[] = [d, ...(d.connections ?? [])];
   const home: FlightDetails[] = d.returnFlight ? [d.returnFlight, ...(d.returnFlight.connections ?? [])] : [];
-  return [...out, ...home].filter((f) => !!f.departure);
+  return [...out.map((f) => ({ f, booking, home: false })), ...home.map((f) => ({ f, booking, home: true }))].filter(
+    (x) => !!x.f.departure,
+  );
 }
 
 /**
@@ -64,19 +66,29 @@ export function sortJourneys(readings: TicketDetails[], fallbackZone: string): S
   const seen = new Set<string>();
   const legs = readings
     .flatMap(singleFlights)
-    .map((f) => flightLeg(f, fallbackZone))
+    .map((x) => ({ ...x, leg: flightLeg(x.f, fallbackZone) }))
     // The same flight on two screenshots counts once.
-    .filter((l) => {
+    .filter(({ leg: l }) => {
       const key = `${l.departure}|${l.airport ?? ''}`;
       return seen.has(key) ? false : (seen.add(key), true);
     })
-    .sort((a, b) => at(a) - at(b));
+    .sort((a, b) => at(a.leg) - at(b.leg));
   const journeys: FlightLeg[] = [];
-  for (const leg of legs) {
-    const last = journeys[journeys.length - 1];
-    const joined = last && at(leg) - at(last) <= DAY_MS ? joinLegs(last, leg) : leg;
-    if (last && joined !== leg) journeys[journeys.length - 1] = joined;
-    else journeys.push(leg);
+  // Which bookings' outbound and home flights each journey holds: a booking's
+  // own flight home never joins its way there, even on a day trip.
+  const parts: { out: Set<number>; home: Set<number> }[] = [];
+  for (const { leg, booking, home } of legs) {
+    const i = journeys.length - 1;
+    const last = journeys[i];
+    const opposite = last && (home ? parts[i].out : parts[i].home).has(booking);
+    const joined = last && !opposite && at(leg) - at(last) <= DAY_MS ? joinLegs(last, leg) : leg;
+    if (last && joined !== leg) {
+      journeys[i] = joined;
+    } else {
+      journeys.push(leg);
+      parts.push({ out: new Set(), home: new Set() });
+    }
+    parts[journeys.length - 1][home ? 'home' : 'out'].add(booking);
   }
   if (journeys.length === 0) return { between: [] };
   if (journeys.length === 1) return { flight: journeys[0], between: [] };

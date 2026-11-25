@@ -41,6 +41,12 @@ describe('sorting screenshots into journeys', () => {
     expect(route(s.returnFlight)).toBe('GOI BOM');
   });
 
+  it("keeps a booking's own flight home apart, even on a day trip", () => {
+    const day: TicketDetails = { ...mumbai, returnFlight: { ...mumbai.returnFlight!, departure: '2026-12-06T19:00' } };
+    const s = sortJourneys([day, { from: A.GOI, to: A.BOM, departure: '2026-12-01T09:00' }], 'Asia/Kolkata');
+    expect(route(s.returnFlight)).toBe('DEL BOM');
+  });
+
   it('lists each flight of a journey', () => {
     const s = sortJourneys([mumbai, pantnagar], 'Asia/Kolkata');
     expect(journeyFlights(s.flight!).map((f) => `${f.departure.slice(11)} ${f.flightNumber} ${f.from}-${f.to}`)).toEqual([

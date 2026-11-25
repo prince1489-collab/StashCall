@@ -289,6 +289,9 @@ export default function EditTrip() {
       flightTouched.current = true;
       setHasFlight(true);
       setFlight(read(personId, 'flight', s.flight));
+    } else if (!existing && !flightTouched.current) {
+      // Hotel bookings only: drop the blank form's made-up flight.
+      setHasFlight(false);
     }
     if (withCheckout) {
       setHasCheckout(true);
