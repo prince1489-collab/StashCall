@@ -1,3 +1,4 @@
+import { isGoing } from '../people';
 import { describe, expect, it } from 'vitest';
 
 import { defaultFlight } from '../timeline';
@@ -64,5 +65,15 @@ describe('trip dates and names', () => {
     expect(isAutoName('My trip', f, city)).toBe(true);
     expect(isAutoName('Family wedding', f, city)).toBe(false);
     expect(isAutoName('Mumbai in December', f, city)).toBe(false);
+  });
+});
+
+describe('isGoing', () => {
+  it('hides a trip from someone who is not on it', () => {
+    expect(isGoing({ travellerIds: ['mahiman'] }, 'bajrang')).toBe(false);
+    expect(isGoing({ travellerIds: ['mahiman', 'bajrang'] }, 'bajrang')).toBe(true);
+    // No list means everyone; a phone that hasn't said who it is sees all.
+    expect(isGoing({}, 'bajrang')).toBe(true);
+    expect(isGoing({ travellerIds: ['mahiman'] }, undefined)).toBe(true);
   });
 });

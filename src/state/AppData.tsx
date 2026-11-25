@@ -4,7 +4,7 @@ import { AppState } from 'react-native';
 
 import type { Trip } from '../domain/types';
 import { removeTrip } from '../domain/household';
-import { tripFor } from '../domain/people';
+import { isGoing, tripFor } from '../domain/people';
 import { nextTrip } from '../domain/trips';
 import { deleteAllPhotos, deletePhoto } from '../storage/photos';
 import { EMPTY_DATA, clearData, loadData, saveData } from '../storage/store';
@@ -103,9 +103,10 @@ export function AppDataProvider({ children }: { children: ReactNode }) {
 
   const value = useMemo<AppDataContext>(() => {
     // Judged as this phone's person travels, so their own later flight keeps a trip coming.
-    const mine = nextTrip(data.trips.map((t) => tripFor(t, data.meId)), new Date(clock));
+    const mine = nextTrip(data.trips.filter((t) => isGoing(t, data.meId)).map((t) => tripFor(t, data.meId)), new Date(clock));
     const coming = mine && data.trips.find((t) => t.id === mine.id);
-    const current = data.trips.find((t) => t.id === viewId) ?? coming;
+    // Someone else's trip still opens on the Trip tab when it's the only one.
+    const current = data.trips.find((t) => t.id === viewId) ?? coming ?? (data.trips.length === 1 ? data.trips[0] : undefined);
     return {
       data,
       ready,
