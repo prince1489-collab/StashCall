@@ -277,6 +277,9 @@ describe('two bookings for one journey', () => {
         { departure: '2026-12-06T12:00', timeZone: 'Asia/Kolkata', flightNumber: '6E7415', airport: 'DEL', destination: 'PGH', terminal: 'T1' },
       ]);
     }
+    // A whole journey joining a flight before it keeps each flight's own stop.
+    const toPgh = { ...delhi, destination: 'DXB', connections: [{ departure: '2026-12-06T18:00', timeZone: 'Asia/Kolkata', airport: 'PGH', destination: 'DXB' }] };
+    expect(joinLegs(udaipur, toPgh).connections?.map((c) => [c.airport, c.destination])).toEqual([['DEL', 'PGH'], ['PGH', 'DXB']]);
     // Sharing the same booking twice adds nothing.
     expect(joinLegs(joinLegs(udaipur, delhi), delhi).connections).toHaveLength(1);
     expect(joinLegs(undefined, delhi)).toBe(delhi);

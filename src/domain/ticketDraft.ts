@@ -93,14 +93,19 @@ export function joinsTrip(trip: Trip, d: TicketDetails): boolean {
 
 const instant = (f: { departure: string; timeZone: string }) => zonedToInstant(f.departure, f.timeZone).getTime();
 
-/** A flight as a connection of another. */
-function asConnection(f: FlightLeg | Connection): Connection {
+/**
+ * A journey's first flight as a connection of another. A journey's
+ * destination is its final stop, so its first flight lands where its first
+ * connection leaves from.
+ */
+function asConnection(f: FlightLeg): Connection {
+  const lands = f.connections?.[0]?.airport ?? f.destination;
   return {
     departure: f.departure,
     timeZone: f.timeZone,
     ...(f.flightNumber && { flightNumber: f.flightNumber }),
     ...(f.airport && { airport: f.airport }),
-    ...(f.destination && { destination: f.destination }),
+    ...(lands && { destination: lands }),
     ...(f.terminal && { terminal: f.terminal }),
   };
 }

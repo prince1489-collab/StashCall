@@ -104,7 +104,8 @@ export default function EditTrip() {
   // Which legs came from a screenshot, so picking a different person keeps them.
   const fromTicket = useRef({ flight: false, returnFlight: false });
   // The legs exactly as read, so a time the user then corrects is kept as typed.
-  const readLegs = useRef<{ flight?: FlightLeg; returnFlight?: FlightLeg }>({});
+  // Every leg read on this screen, in order, so later screenshots add to earlier ones.
+  const readLegs = useRef<{ flight: FlightLeg[]; returnFlight: FlightLeg[] }>({ flight: [], returnFlight: [] });
   // False while the flight is still the blank form's placeholder.
   const flightTouched = useRef(false);
 
@@ -119,8 +120,15 @@ export default function EditTrip() {
     if (own && own[k] !== undefined) return own[k];
     return pid === data.meId ? currentTrip![k] : undefined;
   };
-  /** A leg read from a ticket, joined to what's there (Udaipur → Delhi, then Delhi → Pantnagar). */
-  const joined = (pid: string, k: 'flight' | 'returnFlight', read: FlightLeg) => joinLegs(baseFor(pid, k), read);
+  /**
+   * Records a leg read from a ticket and returns the journey: the saved
+   * flights joined with every leg read on this screen so far (Udaipur → Delhi,
+   * then Delhi → Pantnagar).
+   */
+  const read = (pid: string, k: 'flight' | 'returnFlight', leg?: FlightLeg): FlightLeg => {
+    if (leg) readLegs.current[k].push(leg);
+    return readLegs.current[k].reduce<FlightLeg | null | undefined>((had, l) => joinLegs(had, l), baseFor(pid, k))!;
+  };
   const addedRef = useRef(added);
   addedRef.current = added;
   useEffect(
@@ -144,8 +152,7 @@ export default function EditTrip() {
     if (outbound && !d.returnFlight && !d.checkout && isReturnOf(outbound, d)) {
       fromTicket.current.returnFlight = true;
       setHasReturn(true);
-      readLegs.current.returnFlight = flightLeg(d, hasCheckout ? checkout.timeZone : deviceZone(), hasCheckout && !!checkout.timeZoneConfirmed);
-      setReturnFlight(joined(personId, 'returnFlight', readLegs.current.returnFlight));
+      setReturnFlight(read(personId, 'returnFlight', flightLeg(d, hasCheckout ? checkout.timeZone : deviceZone(), hasCheckout && !!checkout.timeZoneConfirmed)));
       setReadNote(`Added your flight home: ${describeTicket(d, formatLocalDate)}. Check the times before saving.`);
       return;
     }
@@ -155,8 +162,7 @@ export default function EditTrip() {
     if (outbound && draft.returnFlight && d.departure === outbound.departure) {
       fromTicket.current.returnFlight = true;
       setHasReturn(true);
-      readLegs.current.returnFlight = draft.returnFlight;
-      setReturnFlight(joined(personId, 'returnFlight', draft.returnFlight));
+      setReturnFlight(read(personId, 'returnFlight', draft.returnFlight));
       setReadNote(`Added your flight home: ${describeTicket(d.returnFlight!, formatLocalDate)}. Check the times before saving.`);
       return;
     }
@@ -165,8 +171,7 @@ export default function EditTrip() {
       fromTicket.current.flight = true;
       flightTouched.current = true;
       setHasFlight(true);
-      readLegs.current.flight = draft.flight;
-      setFlight(joined(personId, 'flight', draft.flight));
+      setFlight(read(personId, 'flight', draft.flight));
     } else if (!existing && !flightTouched.current) {
       // A hotel-only booking: don't keep the made-up flight from a blank form,
       // but keep a flight the user typed or read from an earlier screenshot.
@@ -179,8 +184,7 @@ export default function EditTrip() {
     if (draft.returnFlight) {
       fromTicket.current.returnFlight = true;
       setHasReturn(true);
-      readLegs.current.returnFlight = draft.returnFlight;
-      setReturnFlight(joined(personId, 'returnFlight', draft.returnFlight));
+      setReturnFlight(read(personId, 'returnFlight', draft.returnFlight));
     }
     setReadNote(`Filled in from your screenshot: ${describeTicket(d, formatLocalDate)}. Check the times before saving.`);
   };
@@ -195,15 +199,15 @@ export default function EditTrip() {
     if (!fromTicket.current.flight) {
       setHasFlight(!!theirs.flight);
       if (theirs.flight) setFlight(theirs.flight);
-    } else if (readLegs.current.flight) {
+    } else if (readLegs.current.flight.length > 0) {
       // The screenshot's flight now joins this person's flights instead.
-      setFlight(joined(personId, 'flight', readLegs.current.flight));
+      setFlight(read(personId, 'flight'));
     }
     if (!fromTicket.current.returnFlight) {
       setHasReturn(!!theirs.returnFlight);
       if (theirs.returnFlight) setReturnFlight(theirs.returnFlight);
-    } else if (readLegs.current.returnFlight) {
-      setReturnFlight(joined(personId, 'returnFlight', readLegs.current.returnFlight));
+    } else if (readLegs.current.returnFlight.length > 0) {
+      setReturnFlight(read(personId, 'returnFlight'));
     }
   }, [personId]); // eslint-disable-line react-hooks/exhaustive-deps
 
