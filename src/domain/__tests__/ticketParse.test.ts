@@ -364,6 +364,24 @@ describe('two bookings for one journey', () => {
     // A different trip altogether: the new flight replaces it.
     const later = defaultFlight('2027-02-10T09:00', 'Asia/Kolkata', true);
     expect(joinLegs(udaipur, later)).toBe(later);
+    // Reading a booking again updates what was saved: a fixed flight number
+    // replaces "G57", on the first flight and on a connection.
+    const saved = joinLegs({ ...udaipur, flightNumber: 'G57', bufferMinutes: 150 }, { ...delhi, flightNumber: undefined });
+    const again = joinLegs(joinLegs(saved, { ...udaipur }), delhi);
+    expect(again.flightNumber).toBe('6E2008');
+    expect(again.bufferMinutes).toBe(150);
+    expect(again.connections?.map((c) => c.flightNumber)).toEqual(['6E7415']);
+    // A reading that misses the number ("QP -11n" in the OCR) still clears a
+    // saved one that was never a flight, and keeps a real one.
+    const akasa = { ...defaultFlight('2026-12-06T07:00', 'Asia/Kolkata', false), airport: 'BOM', destination: 'DEL' };
+    expect(joinLegs({ ...akasa, flightNumber: 'G57' }, akasa).flightNumber).toBeUndefined();
+    expect(joinLegs({ ...akasa, flightNumber: 'QP1111' }, akasa).flightNumber).toBe('QP1111');
+    // A connection read again without its terminal keeps the saved one.
+    const noTerminal = joinLegs(udaipur, { ...delhi, terminal: undefined });
+    expect(joinLegs(joinLegs(udaipur, delhi), { ...delhi, terminal: undefined, flightNumber: '6E7416' }).connections).toEqual([
+      expect.objectContaining({ flightNumber: '6E7416', terminal: 'T1' }),
+    ]);
+    expect(noTerminal.connections?.[0].terminal).toBeUndefined();
     // A flight with no airports (the form's made-up one) is replaced, not joined.
     const blank = defaultFlight('2026-12-06T17:33', 'Asia/Kolkata', true);
     const bom = { ...defaultFlight('2026-12-06T07:00', 'Asia/Kolkata', false), airport: 'BOM', destination: 'DEL' };
@@ -371,6 +389,21 @@ describe('two bookings for one journey', () => {
     // Nor are two flights that don't meet: Udaipur → Delhi, then Mumbai → Goa.
     const goa = { ...defaultFlight('2026-12-06T15:00', 'Asia/Kolkata', false), airport: 'BOM', destination: 'GOI' };
     expect(joinLegs(udaipur, goa)).toBe(goa);
+  });
+});
+
+describe('misread flight numbers', () => {
+  it('reads "QP -11n" next to the airline as QP1111', () => {
+    // The phone's own reading of Mahiman's Yatra ticket.
+    const d = parseTicketText(
+      ['yatra', 'Departure Flight', 'Mumbai to New Delhi | Sun, 06 Dec 2026 PNR Number: P43QHI', '07:00 | SAVER FARE',
+        'Akasa Air QP -11n', 'Mumbai BOM', 'Sun, 06 Dec 2026 07:00', 'Chatrapati Shivaji Airport', 'Terminal: T-2',
+        '-2h 25m-', 'Economy', '951', 'l G57', 'DEL New Delhi', 'Sun, 06 Dec 2026', '09:25', 'Indira Gandhi', 'Airport', 'Terminal: T-1'],
+      today,
+    );
+    expect(d.flightNumber).toBe('QP1111');
+    expect(d.terminal).toBe('T2');
+    expect(d.departure).toBe('2026-12-06T07:00');
   });
 });
 
