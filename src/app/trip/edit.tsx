@@ -127,6 +127,7 @@ export default function EditTrip() {
    * with none of their own flies the trip's (they made it); never someone else's.
    */
   const baseFor = (pid: string, k: 'flight' | 'returnFlight'): FlightLeg | null | undefined => {
+    if (onlyRead.current[k]) return undefined;
     if (!personMode) return existing?.[k];
     const own = currentTrip!.personFlights?.[pid];
     if (own && own[k] !== undefined) return own[k];
@@ -139,7 +140,24 @@ export default function EditTrip() {
    */
   const read = (pid: string, k: 'flight' | 'returnFlight', leg?: FlightLeg): FlightLeg => {
     if (leg) readLegs.current[k].push(leg);
-    return readLegs.current[k].reduce<FlightLeg | null | undefined>((had, l) => joinLegs(had, l), baseFor(pid, k))!;
+    const legs = readLegs.current[k];
+    const journey = legs.reduce<FlightLeg | null | undefined>((had, l) => joinLegs(had, l), baseFor(pid, k))!;
+    // Joined onto a flight that was already there: let the user undo that.
+    if (leg && baseFor(pid, k)) {
+      const alone = legs.reduce<FlightLeg | undefined>((had, l) => joinLegs(had, l), undefined)!;
+      if (JSON.stringify(alone) !== JSON.stringify(journey)) setJoined(k);
+    }
+    return journey;
+  };
+  /** Flights that ignore what was saved before and keep only what was read here. */
+  const onlyRead = useRef({ flight: false, returnFlight: false });
+  const [joined, setJoined] = useState<'flight' | 'returnFlight' | null>(null);
+  const keepOnlyRead = () => {
+    if (!joined) return;
+    onlyRead.current[joined] = true;
+    if (joined === 'flight') setFlight(read(personId, 'flight'));
+    else setReturnFlight(read(personId, 'returnFlight'));
+    setJoined(null);
   };
   const addedRef = useRef(added);
   addedRef.current = added;
@@ -389,6 +407,12 @@ export default function EditTrip() {
           {readNote ??
             'Pick a booking email, boarding pass or hotel booking. StashCall reads it on your phone and keeps it with the trip.'}
         </Text>
+        {joined ? (
+          <Text style={styles.textLink} onPress={keepOnlyRead} accessibilityRole="button">
+            {joined === 'flight' ? 'Joined to the flight that was already there' : 'Joined to the flight home that was already there'}. Not
+            one journey? Tap to use only this ticket.
+          </Text>
+        ) : null}
         {readText ? (
           <>
             <Text style={styles.textLink} onPress={() => setShowText((v) => !v)} accessibilityRole="button">

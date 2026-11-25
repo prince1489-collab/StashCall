@@ -110,15 +110,31 @@ function asConnection(f: FlightLeg): Connection {
   };
 }
 
+/** Every departure on a journey, as instants. */
+const departures = (f: FlightLeg) => [instant(f), ...(f.connections ?? []).map(instant)];
+
+/**
+ * Whether `second` carries on from `first`: it leaves from where `first`
+ * lands, or the two share a flight (the same booking read twice). A flight
+ * with no airports, like the form's made-up one, joins nothing.
+ */
+function connects(first: FlightLeg, second: FlightLeg): boolean {
+  const a = departures(first);
+  if (departures(second).some((t) => a.includes(t))) return true;
+  return !!first.destination && !!second.airport && first.destination === second.airport;
+}
+
 /**
  * Two bookings for one journey, like Udaipur → Delhi and Delhi → Pantnagar
  * on the same day, become one: the day is planned from the first flight, and
- * the later ones are its connections. Flights more than a day apart aren't
- * one journey: the new one replaces the old.
+ * the later ones are its connections. Flights more than a day apart, or
+ * that don't carry on from each other, aren't one journey: the new one
+ * replaces the old.
  */
 export function joinLegs(had: FlightLeg | null | undefined, read: FlightLeg): FlightLeg {
   if (!had || Math.abs(instant(had) - instant(read)) > 24 * 3600 * 1000) return read;
   const [first, second] = instant(had) <= instant(read) ? [had, read] : [read, had];
+  if (!connects(first, second)) return read;
   const all = [...(first.connections ?? []), asConnection(second), ...(second.connections ?? [])];
   // The same flight in both bookings counts once.
   const seen = new Set<number>([instant(first)]);
