@@ -16,6 +16,7 @@ import { BeforeYouGo } from '../../ui/BeforeYouGo';
 import { PrimaryButton, formatLocalDate } from '../../ui/Form';
 import { ReminderStatus } from '../../ui/ReminderStatus';
 import { BoardingPasses } from '../../ui/BoardingPasses';
+import { FamilyStatus } from '../../ui/FamilyStatus';
 import { Tickets } from '../../ui/Tickets';
 import { Timeline } from '../../ui/Timeline';
 import { colors, fonts, space } from '../../ui/theme';
@@ -180,6 +181,7 @@ function TripDetail({ trip }: { trip: Trip }) {
         {[days, goingNames(trip, data.owners)].filter(Boolean).join(' · ')}
       </Text>
       <SharedWith />
+      <FamilyStatus trip={trip} now={now} />
       {going.length > 1 ? (
         <View style={styles.plans}>
           <Text style={styles.whoHeading}>Plans</Text>

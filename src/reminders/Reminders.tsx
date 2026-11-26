@@ -5,7 +5,7 @@ import { AppState } from 'react-native';
 import { isGoing, tripFor } from '../domain/people';
 import { upcomingTrips } from '../domain/trips';
 import { useAppData } from '../state/AppData';
-import { planPrepReminders, planReminders } from './plan';
+import { planCheckInReminders, planPrepReminders, planReminders } from './plan';
 import { latestOnly } from './serial';
 import type { PermissionState } from './schedule';
 import { getPermission, hasExactAlarms, requestExactAlarms, requestPermission, syncReminders } from './schedule';
@@ -52,7 +52,7 @@ export function RemindersProvider({ children }: { children: ReactNode }) {
           // Only trips this person is going on: no reminders for someone else's.
           data.trips.filter((t) => isGoing(t, data.meId)).map((t) => tripFor(t, data.meId)),
           now,
-        ).flatMap((t) => [...planPrepReminders(t, data, now), ...planReminders(t, data.items, now, data.owners, data.meId)]);
+        ).flatMap((t) => [...planPrepReminders(t, data, now), ...planCheckInReminders(t, now), ...planReminders(t, data.items, now, data.owners, data.meId)]);
         setScheduled(await syncReminders(plan, data.trips.map((t) => t.id)));
       }),
     [queue, data.items, data.trips, data.insurance, data.insuranceEnds, data.passportExpires, data.owners, data.meId],

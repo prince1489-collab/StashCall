@@ -16,6 +16,7 @@ import { Logo } from '../../ui/Icons';
 import { PrimaryButton, formatLocalDate } from '../../ui/Form';
 import { ReminderStatus } from '../../ui/ReminderStatus';
 import { BoardingPasses } from '../../ui/BoardingPasses';
+import { FamilyStatus } from '../../ui/FamilyStatus';
 import { Tickets } from '../../ui/Tickets';
 import { colors, fonts, space } from '../../ui/theme';
 
@@ -151,6 +152,7 @@ export default function Today() {
           />
         </View>
       )}
+      <FamilyStatus trip={currentTrip} now={now} />
       {next ? <BeforeYouGo trip={currentTrip} compact /> : null}
       {soon ? <BoardingPasses trip={currentTrip} compact /> : null}
       {soon ? <Tickets trip={currentTrip} compact /> : null}

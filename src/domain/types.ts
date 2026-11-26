@@ -28,7 +28,19 @@ export interface Owner {
   passportExpires?: LocalDate;
   /** True once they use StashCall on their own phone, so others' phones stop covering their items. */
   ownPhone?: boolean;
+  /** Where they are on a travel day, as they last said: shared with the household. */
+  status?: TravelStatus;
 }
+
+/** A travel-day update: "Left for the airport" at 05:10. */
+export interface TravelStatus {
+  tripId: string;
+  step: StatusStep;
+  /** When they said so, as an ISO instant. */
+  at: string;
+}
+
+export type StatusStep = 'left' | 'airport' | 'landed' | 'arrived';
 
 /** Friendlier name for the same thing: the household's people. */
 export type Person = Owner;
