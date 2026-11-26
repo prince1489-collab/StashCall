@@ -11,6 +11,8 @@ export interface TicketDetails {
   to?: Airport;
   /** Departure, in the departure airport's wall-clock time. */
   departure?: LocalDateTime;
+  /** When it lands, in the arrival airport's wall-clock time, if the ticket says. */
+  arrival?: LocalDateTime;
   /** Hotel checkout, in the hotel's wall-clock time. */
   checkout?: LocalDateTime;
   /** Departure terminal, e.g. "T1". */
@@ -229,6 +231,9 @@ function columnFlights(text: string, today: Date): FlightDetails[] | undefined {
   const to = column(/^\s*To\s*$/im, /\barriv/i);
   // Only a real table: From and To headings with a city under each.
   if (from.length === 0 || to.length === 0) return undefined;
+  // The Arrives column: its first n times, after the heading.
+  const arrivesAt = text.search(/\barriv/i);
+  const landings = arrivesAt === -1 ? [] : findTimes(text.slice(arrivesAt)).slice(0, n);
 
   return numbers.map((num, i) => {
     const f: FlightDetails = {
@@ -240,6 +245,7 @@ function columnFlights(text: string, today: Date): FlightDetails[] | undefined {
     if (a) f.from = a;
     if (b) f.to = b;
     if (from[i]?.terminal) f.terminal = `T${from[i].terminal}`;
+    if (landings.length === n) f.arrival = arrivalAfter(f.departure!, landings[i].value);
     return f;
   });
 }
@@ -319,7 +325,19 @@ export interface FlightDetails {
   from?: Airport;
   to?: Airport;
   departure?: LocalDateTime;
+  /** When it lands, in the arrival airport's time, if the ticket says. */
+  arrival?: LocalDateTime;
   terminal?: string;
+}
+
+/** A landing time after `departure`: the same day, or the next when it's earlier on the clock. */
+function arrivalAfter(departure: LocalDateTime, time: string, day?: Day, today?: Date): LocalDateTime {
+  if (day && today) return local(withYear(day, today), time);
+  const date = departure.slice(0, 10);
+  if (time >= departure.slice(11, 16)) return `${date}T${time}`;
+  const next = new Date(`${date}T00:00:00Z`);
+  next.setUTCDate(next.getUTCDate() + 1);
+  return `${next.toISOString().slice(0, 10)}T${time}`;
 }
 
 /** Airline codes that contain a digit: IndiGo, Go First, AirAsia India, easyJet, Wizz, JetBlue, Frontier, Cebu, Jet. */
@@ -369,7 +387,22 @@ function parseFlight(flightText: string, today: Date): FlightDetails {
     const time =
       candidates.find((t) => arrives === -1 || t.index < arrives || arrives < date.index) ?? candidates[0];
     const isFlight = time && (airports.length > 0 || /flight|depart|boarding|gate|seat/i.test(flightText));
-    if (isFlight) details.departure = local(withYear(date.value, today), time.value);
+    if (isFlight) {
+      details.departure = local(withYear(date.value, today), time.value);
+      // Landing: the next time after take-off that isn't boarding, a gate or
+      // check-in, with its own date when one sits just before it.
+      const after = findTimes(flightText).filter(
+        (t) =>
+          t.index > time.index &&
+          t.value !== time.value &&
+          !insideDate(t) &&
+          !/board|gate|check[\s-]?in|clos|depart|duration/i.test(lineAt(flightText, t.index)),
+      )[0];
+      if (after) {
+        const day = dates.filter((d) => d.index > time.index && d.end <= after.index).pop();
+        details.arrival = arrivalAfter(details.departure, after.value, day?.value, today);
+      }
+    }
   }
   if (details.departure) {
     details.flightNumber = findFlightNumber(flightText);

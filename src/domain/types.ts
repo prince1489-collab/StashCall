@@ -87,6 +87,10 @@ export interface FlightLeg {
   terminal?: string;
   /** Later flights the same journey connects to, in order. */
   connections?: Connection[];
+  /** When the journey's last flight lands, in the destination's time zone. */
+  lands?: LocalDateTime;
+  /** Airport to the hotel (on the way there) or home (on the way back). */
+  onwardMinutes?: number;
 }
 
 /** A connecting flight: Delhi → Pantnagar after Udaipur → Delhi. */
@@ -189,7 +193,11 @@ export type StepKind =
   | 'returnAirport'
   | 'returnTakeoff'
   | 'connection'
-  | 'returnConnection';
+  | 'returnConnection'
+  | 'checkin'
+  | 'bookRide'
+  | 'land'
+  | 'arrive';
 
 export interface TimelineStep {
   kind: StepKind;
@@ -209,4 +217,6 @@ export interface TimelineStep {
   remindAt?: Date;
   /** A line of detail, e.g. "6E7415 to Pantnagar from T1". */
   detail?: string;
+  /** A web page for the step, like the airline's check-in. */
+  link?: string;
 }

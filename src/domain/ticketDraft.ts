@@ -63,8 +63,13 @@ export function flightLeg(
     ...(f.flightNumber && { flightNumber: f.flightNumber }),
     ...(f.terminal && { terminal: f.terminal }),
     ...(connections.length > 0 && { connections }),
+    // The journey lands when its last flight does.
+    ...(lastArrival(f) && { lands: lastArrival(f) }),
   };
 }
+
+const lastArrival = (f: FlightDetails & { connections?: FlightDetails[] }) =>
+  f.connections?.length ? f.connections[f.connections.length - 1].arrival : f.arrival;
 
 /**
  * True when a single flight read off a screenshot looks like the way home
@@ -172,5 +177,9 @@ export function joinLegs(had: FlightLeg | null | undefined, read: FlightLeg): Fl
     // Abroad if any flight on the way is.
     international: first.international || second.international,
     ...(connections.length > 0 && { connections }),
+    // Lands when the later booking's last flight does; the person's own
+    // airport-to-hotel time stays.
+    lands: Math.max(...departures(second)) >= Math.max(...departures(first)) ? (second.lands ?? (same ? had.lands : undefined)) : first.lands,
+    onwardMinutes: had.onwardMinutes ?? read.onwardMinutes,
   };
 }

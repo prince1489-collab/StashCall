@@ -283,6 +283,9 @@ describe('IndiGo tables read column by column', () => {
     expect(d.returnFlight?.from?.code).toBe('PGH');
     expect(d.returnFlight?.to?.code).toBe('DEL');
     expect(d.returnFlight?.terminal).toBeUndefined();
+    // Landing times, from the Arrives column.
+    expect(d.arrival).toBe('2026-12-06T13:00');
+    expect(d.returnFlight?.arrival).toBe('2026-12-08T14:15');
   });
 
   it("reads Bajrang's Udaipur booking, aircraft types and all", () => {
@@ -298,6 +301,8 @@ describe('IndiGo tables read column by column', () => {
     expect(d.returnFlight?.from?.code).toBe('DEL');
     expect(d.returnFlight?.terminal).toBe('T1');
     expect(d.returnFlight?.to?.code).toBe('UDR');
+    expect(d.arrival).toBe('2026-12-06T10:20');
+    expect(d.returnFlight?.arrival).toBe('2026-12-08T19:20');
   });
 
   it('leaves other layouts to the row reader', () => {
@@ -327,6 +332,7 @@ describe('Yatra e-tickets', () => {
     expect(d.to?.code).toBe('BOM');
     expect(d.terminal).toBe('T1');
     expect(d.flightNumber).toBe('6E328');
+    expect(d.arrival).toBe('2026-12-08T20:10');
   });
 
   it('reads an Akasa flight number written with a dash', () => {
@@ -404,6 +410,7 @@ describe('misread flight numbers', () => {
     expect(d.flightNumber).toBe('QP1111');
     expect(d.terminal).toBe('T2');
     expect(d.departure).toBe('2026-12-06T07:00');
+    expect(d.arrival).toBe('2026-12-06T09:25');
   });
 });
 

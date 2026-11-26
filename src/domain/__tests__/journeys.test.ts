@@ -67,3 +67,24 @@ describe('whose ticket', () => {
     expect(namedOn('DEL to PGH', people)).toEqual([]);
   });
 });
+
+describe('landing and the ride on', () => {
+  it('lands when the last booking does, and plans the ride to the hotel', async () => {
+    const { joinLegs } = await import('../ticketDraft');
+    const { buildTimeline, defaultFlight } = await import('../timeline');
+    const qp = { ...defaultFlight('2026-12-06T07:00', 'Asia/Kolkata', false), airport: 'BOM', destination: 'DEL', flightNumber: 'QP1111', lands: '2026-12-06T09:25' };
+    const pgh = { ...defaultFlight('2026-12-06T12:00', 'Asia/Kolkata', false), airport: 'DEL', destination: 'PGH', flightNumber: '6E7415', lands: '2026-12-06T13:00' };
+    const j = joinLegs({ ...qp, onwardMinutes: 45 }, pgh);
+    expect(j.lands).toBe('2026-12-06T13:00');
+    expect(j.onwardMinutes).toBe(45);
+    // Either order of adding the screenshots.
+    expect(joinLegs(pgh, qp).lands).toBe('2026-12-06T13:00');
+
+    const steps = buildTimeline({ flight: j });
+    const at = (k: string) => steps.filter((s) => s.kind === k).map((s) => `${s.localTime} ${s.title}${s.detail ? ` (${s.detail})` : ''}`);
+    expect(at('land')).toEqual(['13:00 Land in Pantnagar (Ride to the hotel: about 45 min)']);
+    expect(at('arrive')).toEqual(['14:15 At the hotel']);
+    expect(at('checkin')).toEqual(['07:00 Web check-in opens (QP1111 · Akasa Air)', '12:00 Web check-in opens (6E7415 · IndiGo)']);
+    expect(at('bookRide')).toHaveLength(1);
+  });
+});

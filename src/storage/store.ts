@@ -21,6 +21,8 @@ export interface AppData {
   meId?: string;
   /** The household passport that runs out first, if known. Used until people have their own dates. */
   passportExpires?: LocalDate;
+  /** This phone's own messages for a driver, in any language, with {time}-style blanks. Not shared. */
+  driverTemplates?: { toAirport?: string; fromAirport?: string };
 }
 
 const KEY = 'stashcall:data';

@@ -16,7 +16,7 @@ import { BeforeYouGo } from '../../ui/BeforeYouGo';
 import { PrimaryButton, formatLocalDate } from '../../ui/Form';
 import { ReminderStatus } from '../../ui/ReminderStatus';
 import { BoardingPasses } from '../../ui/BoardingPasses';
-import { RideLinks } from '../../ui/RideLinks';
+import { JourneyRides, stepAction } from '../../ui/RideLinks';
 import { FamilyStatus } from '../../ui/FamilyStatus';
 import { Tickets } from '../../ui/Tickets';
 import { Timeline } from '../../ui/Timeline';
@@ -207,10 +207,10 @@ function TripDetail({ trip }: { trip: Trip }) {
         </View>
       ) : null}
       {plan.flight ? <Journey label="Getting there" f={plan.flight} lead /> : null}
-      {plan.flight && isMe ? <RideLinks f={plan.flight} leave={steps.find((s) => s.kind === 'leave')} from="home" /> : null}
+      {plan.flight && isMe ? <JourneyRides f={plan.flight} leave={steps.find((s) => s.kind === 'leave')} home={false} /> : null}
       {plan.returnFlight ? <Journey label="Coming home" f={plan.returnFlight} /> : null}
       {plan.returnFlight && isMe ? (
-        <RideLinks f={plan.returnFlight} leave={steps.find((s) => s.kind === 'returnLeave')} from="hotel" />
+        <JourneyRides f={plan.returnFlight} leave={steps.find((s) => s.kind === 'returnLeave')} home />
       ) : null}
       {person && going.length > 1 ? (
         <Text
@@ -224,7 +224,12 @@ function TripDetail({ trip }: { trip: Trip }) {
       ) : null}
       {/* Boarding passes are for the person holding this phone. */}
       {(person?.id ?? data.meId) === data.meId ? <BoardingPasses trip={mine} /> : null}
-      <Timeline steps={steps} now={now} itemsFor={(s) => stepItemNames(plan, data.items, s, data.owners)} />
+      <Timeline
+        steps={steps}
+        now={now}
+        itemsFor={(s) => stepItemNames(plan, data.items, s, data.owners)}
+        actionFor={isMe ? (s) => stepAction(s, steps, plan, data.driverTemplates) : undefined}
+      />
       <Text style={styles.sectionHeading}>For everyone</Text>
       <BeforeYouGo trip={mine} />
       <Tickets trip={mine} />

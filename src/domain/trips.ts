@@ -3,7 +3,8 @@ import type { Trip } from './types';
 
 /** When a trip's plan starts and ends: its first and last step. Undefined for a trip with no times yet. */
 export function tripSpan(trip: Trip): { start: Date; end: Date } | undefined {
-  const steps = buildTimeline(trip);
+  // Check-in opening days before doesn't start the trip.
+  const steps = buildTimeline(trip).filter((s) => s.kind !== 'checkin');
   if (steps.length === 0) return undefined;
   return { start: steps[0].at, end: steps[steps.length - 1].at };
 }

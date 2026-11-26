@@ -45,6 +45,12 @@ export default function Settings() {
         </Text>
       </Section>
 
+      <Section title="Driver message">
+        <Text style={styles.action} onPress={() => router.push('/driver-message')} accessibilityRole="button">
+          {data.driverTemplates?.toAirport || data.driverTemplates?.fromAirport ? 'Your own message' : 'Write your own, in any language'}
+        </Text>
+      </Section>
+
       <Section title="People">
         <Text style={styles.action} onPress={() => router.push('/people')} accessibilityRole="button">
           {data.owners.length > 0 ? data.owners.map((p) => p.name).join(', ') : 'Add the people you travel with'}
