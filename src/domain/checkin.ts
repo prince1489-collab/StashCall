@@ -38,7 +38,12 @@ const codeOf = (n: string) => n.slice(0, 2).toUpperCase();
  * are skipped, since we can't tell the airline.
  */
 export function checkIns(trip: Pick<Trip, 'flight' | 'returnFlight'>): CheckIn[] {
-  const journey = (f: FlightLeg | undefined, home: boolean): CheckIn[] => {
+  return [...journeyCheckIns(trip.flight, false), ...journeyCheckIns(trip.returnFlight, true)].sort((a, b) => a.at.getTime() - b.at.getTime());
+}
+
+/** When check-in opens for each airline on one journey. */
+export function journeyCheckIns(f: FlightLeg | undefined, home = false): CheckIn[] {
+  {
     if (!f) return [];
     const flights = [f, ...(f.connections ?? [])].filter((x) => x.flightNumber);
     const byCode = new Map<string, CheckIn>();
@@ -55,6 +60,5 @@ export function checkIns(trip: Pick<Trip, 'flight' | 'returnFlight'>): CheckIn[]
       }
     }
     return [...byCode.values()];
-  };
-  return [...journey(trip.flight, false), ...journey(trip.returnFlight, true)].sort((a, b) => a.at.getTime() - b.at.getTime());
+  }
 }

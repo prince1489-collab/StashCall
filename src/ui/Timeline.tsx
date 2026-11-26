@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { StyleSheet, Text, View } from 'react-native';
+import { Linking, StyleSheet, Text, View } from 'react-native';
 
 import { instantToZoned } from '../domain/time';
 import { itemCountLabel } from '../domain/tripItems';
@@ -15,11 +15,14 @@ export function Timeline({
   steps,
   now = new Date(),
   itemsFor,
+  actionFor,
 }: {
   steps: TimelineStep[];
   now?: Date;
   /** Names of the items a reminder step covers. */
   itemsFor?: (step: TimelineStep) => string[];
+  /** Something to tap on a step: "Check in", "Message a driver". */
+  actionFor?: (step: TimelineStep) => { label: string; url: string } | undefined;
 }) {
   const [openStep, setOpenStep] = useState<number | null>(null);
   let lastDay = '';
@@ -52,6 +55,14 @@ export function Timeline({
                     {openStep === i ? items.join(' · ') : `${itemCountLabel(s, items.length)} ›`}
                   </Text>
                 ) : null}
+                {(() => {
+                  const a = actionFor?.(s);
+                  return a ? (
+                    <Text style={styles.items} onPress={() => Linking.openURL(a.url).catch(() => {})} accessibilityRole="link">
+                      {a.label} ›
+                    </Text>
+                  ) : null;
+                })()}
               </View>
             </View>
           </View>

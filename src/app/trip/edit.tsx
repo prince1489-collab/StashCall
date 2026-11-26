@@ -625,6 +625,7 @@ export default function EditTrip() {
               value={flight.packTime}
               onChange={(packTime) => setF({ packTime })}
             />
+            <Landing leg={flight} place="hotel" onChange={setF} />
           </>
         ) : null}
       </Section>
@@ -697,6 +698,7 @@ export default function EditTrip() {
               onChange={(bufferMinutes) => setR({ bufferMinutes })}
               min={30}
             />
+            <Landing leg={returnFlight} place="home" onChange={setR} />
           </>
         ) : null}
       </Section>
@@ -763,6 +765,7 @@ function Connections({ leg, onChange }: { leg: FlightLeg; onChange: (c: FlightLe
 }
 
 const styles = StyleSheet.create({
+  addLanding: { fontSize: 15, color: colors.accent, fontWeight: "600", paddingHorizontal: space.l, paddingVertical: space.m },
   connections: { paddingHorizontal: space.l, paddingBottom: space.m, gap: space.s },
   connection: { flexDirection: 'row', alignItems: 'center', gap: space.m },
   connectionText: { flex: 1, fontSize: 14, color: colors.text },
@@ -793,3 +796,49 @@ const styles = StyleSheet.create({
   warn: { color: colors.warn, marginBottom: space.s },
   delete: { color: colors.danger, textAlign: 'center', fontSize: 16, marginTop: space.xl, padding: space.s },
 });
+
+/**
+ * When the journey lands, and how long from that airport to the hotel or
+ * home: plans the ride from the airport. Optional; a ticket fills it in
+ * when it shows the arrival time.
+ */
+function Landing({ leg, place, onChange }: { leg: FlightLeg; place: 'hotel' | 'home'; onChange: (patch: Partial<FlightLeg>) => void }) {
+  const last = leg.connections?.length ? leg.connections[leg.connections.length - 1].departure : leg.departure;
+  if (!leg.lands) {
+    return (
+      <Text
+        style={styles.addLanding}
+        onPress={() => onChange({ lands: addLocalMinutes(last, 120) })}
+        accessibilityRole="button"
+      >
+        + When you land, to plan the ride to {place === 'hotel' ? 'the hotel' : 'home'}
+      </Text>
+    );
+  }
+  const city = leg.destination ? AIRPORTS[leg.destination]?.city : undefined;
+  return (
+    <>
+      <DateTimeRow
+        label="Lands"
+        hint={city ? `${city} time` : 'Local time where you land'}
+        value={leg.lands}
+        onChange={(lands) => onChange({ lands })}
+      />
+      <MinutesStepper
+        label={place === 'hotel' ? 'Airport to hotel' : 'Airport to home'}
+        value={leg.onwardMinutes ?? DEFAULTS.travelMinutes}
+        onChange={(onwardMinutes) => onChange({ onwardMinutes })}
+        min={15}
+      />
+      <Text style={styles.addLanding} onPress={() => onChange({ lands: undefined, onwardMinutes: undefined })} accessibilityRole="button">
+        Remove landing time
+      </Text>
+    </>
+  );
+}
+
+/** "2026-12-06T12:00" plus 120 minutes, as wall-clock time. */
+function addLocalMinutes(local: string, minutes: number): string {
+  const d = new Date(`${local}:00Z`);
+  return new Date(d.getTime() + minutes * 60000).toISOString().slice(0, 16);
+}
