@@ -1,6 +1,8 @@
 import { AIRPORTS } from './airports';
 import { addMinutes, timeLabel } from './time';
 import { EXIT_MINUTES } from './timeline';
+import { mapsLink } from './places';
+import type { Place } from './places';
 import type { FlightLeg, TimelineStep, Trip } from './types';
 
 /**
@@ -25,12 +27,13 @@ export const BLANKS: { key: string; means: string }[] = [
   { key: 'to', means: 'where you are going, e.g. Mumbai airport (BOM), Terminal 2' },
   { key: 'flight', means: 'flight number, e.g. QP1111' },
   { key: 'flightTime', means: 'when the flight leaves or lands, e.g. 07:00' },
+  { key: 'map', means: 'a Google Maps link to your home or hotel, once you add its pin' },
 ];
 
 export const DEFAULT_TO_AIRPORT =
-  'Hi, could you pick me up from {from} on {day} at {time} for {to}? My flight {flight} leaves at {flightTime}. Thanks!';
+  'Hi, could you pick me up from {from} on {day} at {time} for {to}? My flight {flight} leaves at {flightTime}. {map} Thanks!';
 export const DEFAULT_FROM_AIRPORT =
-  'Hi, could you pick me up from {from} on {day} at {time}? My flight {flight} lands at {flightTime}. Please take me to {to}. Thanks!';
+  'Hi, could you pick me up from {from} on {day} at {time}? My flight {flight} lands at {flightTime}. Please take me to {to}. {map} Thanks!';
 
 export interface Ride {
   day: string;
@@ -39,6 +42,8 @@ export interface Ride {
   to: string;
   flight?: string;
   flightTime: string;
+  /** Google Maps link to the home or hotel end of the ride, when its pin is known. */
+  map?: string;
 }
 
 /** Fills a message's blanks. A blank with nothing to put in goes, with any space before it. */
@@ -53,12 +58,16 @@ export function fillMessage(template: string, ride: Ride): string {
     .trim();
 }
 
-/** The ride to the airport for a flight. */
-export function rideTo(f: FlightLeg, pickup: { day: string; time: string } | undefined, from: 'home' | 'hotel'): Ride {
+/** "home", or the hotel's name when the person gave one. */
+const placeName = (kind: 'home' | 'hotel', place?: Place) => place?.name?.trim() || (kind === 'home' ? 'home' : 'the hotel');
+
+/** The ride to the airport for a flight, from home or the hotel (`place`, when its pin is known). */
+export function rideTo(f: FlightLeg, pickup: { day: string; time: string } | undefined, from: 'home' | 'hotel', place?: Place): Ride {
   return {
     day: pickup?.day ?? '',
     time: pickup?.time ?? '',
-    from: from === 'home' ? 'home' : 'the hotel',
+    from: placeName(from, place),
+    map: place && mapsLink(place),
     to: airportLabel(f.airport, f.terminal),
     flight: f.flightNumber,
     flightTime: f.departure.slice(11, 16),
@@ -73,11 +82,21 @@ export function driverMessage(ride: Ride, template: string | undefined, fromAirp
 /** WhatsApp with the message written; the person picks who to send it to. */
 export const whatsappUrl = (text: string) => `https://wa.me/?text=${encodeURIComponent(text)}`;
 
-/** Opens Uber from where the person is, with the drop-off named when we know it. */
-export function uberUrl(dropoff?: string, pin?: { lat: number; lng: number }): string {
+/**
+ * Opens Uber with the drop-off named when we know it. Pickup is where the
+ * phone is, or `pickup` (home, the hotel) when its pin is known: the right
+ * door even when booking ahead or for someone else.
+ */
+export function uberUrl(dropoff?: string, pin?: { lat: number; lng: number }, pickup?: Place): string {
   const q = new URLSearchParams({
     action: 'setPickup',
-    pickup: 'my_location',
+    ...(pickup
+      ? {
+          'pickup[latitude]': String(pickup.lat),
+          'pickup[longitude]': String(pickup.lng),
+          ...(pickup.name?.trim() && { 'pickup[nickname]': pickup.name.trim() }),
+        }
+      : { pickup: 'my_location' }),
     ...(dropoff && { 'dropoff[nickname]': dropoff }),
     // Uber only fills in "Where to?" from a point on the map.
     ...(pin && { 'dropoff[latitude]': String(pin.lat), 'dropoff[longitude]': String(pin.lng) }),
@@ -89,14 +108,15 @@ export function uberUrl(dropoff?: string, pin?: { lat: number; lng: number }): s
  * The ride from the airport after the journey's last flight lands: pickup
  * half an hour after landing, at the destination airport.
  */
-export function rideFrom(f: FlightLeg, pickup: { day: string; time: string }, place: 'home' | 'hotel'): Ride | undefined {
+export function rideFrom(f: FlightLeg, pickup: { day: string; time: string }, to: 'home' | 'hotel', place?: Place): Ride | undefined {
   if (!f.lands) return undefined;
   const last = f.connections?.length ? f.connections[f.connections.length - 1] : undefined;
   return {
     day: pickup.day,
     time: pickup.time,
     from: airportLabel(f.destination),
-    to: place === 'home' ? 'home' : 'the hotel',
+    to: placeName(to, place),
+    map: place && mapsLink(place),
     flight: last ? last.flightNumber : f.flightNumber,
     flightTime: f.lands.slice(11, 16),
   };
@@ -114,6 +134,12 @@ export function trafficUrl(code: string, terminal?: string): string {
   return `https://www.google.com/maps/dir/?${q.toString()}`;
 }
 
+/** This phone's home and the trip's hotel, where their pins are known. */
+export interface Places {
+  home?: Place;
+  stay?: Place;
+}
+
 /**
  * Taps on the timeline: "Check in" on check-in opening, "Check traffic"
  * when it's time to leave, "Message a driver" on booking the ride and on
@@ -124,6 +150,7 @@ export function stepAction(
   steps: TimelineStep[],
   plan: Pick<Trip, 'flight' | 'returnFlight'>,
   templates: { toAirport?: string; fromAirport?: string } | undefined,
+  places: Places = {},
 ): { label: string; url: string } | undefined {
   const day = (d: Date, tz: string) => d.toLocaleDateString(undefined, { weekday: 'short', day: 'numeric', month: 'short', timeZone: tz });
   if (s.kind === 'checkin') return s.link ? { label: 'Check in', url: s.link } : undefined;
@@ -137,7 +164,7 @@ export function stepAction(
     const leave = steps.find((x) => x.kind === (home ? 'returnLeave' : 'leave'));
     const f = home ? plan.returnFlight : plan.flight;
     if (!f || !leave) return undefined;
-    const ride = rideTo(f, { day: day(leave.at, leave.timeZone), time: leave.localTime }, home ? 'hotel' : 'home');
+    const ride = rideTo(f, { day: day(leave.at, leave.timeZone), time: leave.localTime }, home ? 'hotel' : 'home', home ? places.stay : places.home);
     return { label: 'Message a driver', url: whatsappUrl(driverMessage(ride, templates?.toAirport)) };
   }
   if (s.kind === 'land') {
@@ -145,7 +172,7 @@ export function stepAction(
     const f = home ? plan.returnFlight : plan.flight;
     if (!f) return undefined;
     const pickup = addMinutes(s.at, EXIT_MINUTES);
-    const ride = rideFrom(f, { day: day(pickup, s.timeZone), time: timeLabel(pickup, s.timeZone) }, home ? 'home' : 'hotel');
+    const ride = rideFrom(f, { day: day(pickup, s.timeZone), time: timeLabel(pickup, s.timeZone) }, home ? 'home' : 'hotel', home ? places.home : places.stay);
     return ride ? { label: 'Message a driver', url: whatsappUrl(driverMessage(ride, templates?.fromAirport, true)) } : undefined;
   }
   return undefined;

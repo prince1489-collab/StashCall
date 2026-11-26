@@ -1,3 +1,5 @@
+import type { Place } from './places';
+
 /**
  * Core data model for StashCall phase 1.
  *
@@ -163,6 +165,8 @@ export interface Trip {
   visaExpires?: LocalDate;
   /** Item ids ticked off, keyed by timeline step kind. */
   ticked: Partial<Record<StepKind, string[]>>;
+  /** Where everyone is staying, with its map pin: rides from the airport go here. */
+  stay?: Place;
   /** Timeline steps ticked off, keyed by "personId|step" (see domain/stepsDone). */
   stepsDone?: Record<string, StepDone>;
   createdAt: string;

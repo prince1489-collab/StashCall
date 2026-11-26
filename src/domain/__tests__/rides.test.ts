@@ -48,4 +48,20 @@ describe('traffic', () => {
     expect(trafficUrl('BOM', 'T2')).toBe('https://www.google.com/maps/dir/?api=1&destination=Mumbai+airport+BOM+Terminal+2&travelmode=driving');
     expect(trafficUrl('PGH')).toContain('destination=Pantnagar+airport+PGH&');
   });
+
+  it('sends the ride to the hotel or home pin when there is one', () => {
+    const hotel = { name: 'Hotel Lakeview, Nainital', lat: 29.3945, lng: 79.4521 };
+    const j = { ...qp, lands: '2026-12-06T13:15' } as FlightLeg;
+    const r = rideFrom(j, { day: 'Sun 6 Dec', time: '13:45' }, 'hotel', hotel)!;
+    expect(driverMessage(r, undefined, true)).toBe(
+      'Hi, could you pick me up from Pantnagar airport (PGH) on Sun 6 Dec at 13:45? My flight QP1111 lands at 13:15. Please take me to Hotel Lakeview, Nainital. https://maps.google.com/?q=29.3945,79.4521 Thanks!',
+    );
+    const back = rideTo(qp, { day: 'Tue 8 Dec', time: '10:00' }, 'hotel', { lat: 29.3945, lng: 79.4521 });
+    expect(back.from).toBe('the hotel');
+    expect(back.map).toBe('https://maps.google.com/?q=29.3945,79.4521');
+    const url = uberUrl(r.to, hotel, { lat: 29.03, lng: 79.46 });
+    expect(url).toContain('dropoff%5Blatitude%5D=29.3945');
+    expect(url).toContain('pickup%5Blatitude%5D=29.03&pickup%5Blongitude%5D=79.46');
+    expect(url).not.toContain('my_location');
+  });
 });
