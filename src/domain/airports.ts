@@ -94,6 +94,7 @@ const RAW: [string, string, string, string][] = [
   ['JAI', 'Jaipur', 'IN', 'Asia/Kolkata'],
   ['JDH', 'Jodhpur', 'IN', 'Asia/Kolkata'],
   ['LKO', 'Lucknow', 'IN', 'Asia/Kolkata'],
+  ['KNU', 'Kanpur', 'IN', 'Asia/Kolkata'],
   ['IXC', 'Chandigarh', 'IN', 'Asia/Kolkata'],
   ['DED', 'Dehradun', 'IN', 'Asia/Kolkata'],
   ['VNS', 'Varanasi', 'IN', 'Asia/Kolkata'],
