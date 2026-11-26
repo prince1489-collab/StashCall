@@ -65,10 +65,12 @@
         "expo-share-intent",
         {
           "androidIntentFilters": [
-            "image/*"
+            "image/*",
+            "application/pdf"
           ],
           "androidMultiIntentFilters": [
-            "image/*"
+            "image/*",
+            "application/pdf"
           ],
           "disableIOS": true
         }

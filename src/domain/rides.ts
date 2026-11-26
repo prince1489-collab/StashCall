@@ -97,8 +97,21 @@ export function rideFrom(f: FlightLeg, pickup: { day: string; time: string }, pl
 }
 
 /**
- * Taps on the timeline: "Check in" on check-in opening, "Message a driver"
- * on booking the ride and on landing.
+ * Google Maps, driving from wherever the phone is to the departure
+ * terminal: live traffic and the drive time right now. Free, no key.
+ */
+export function trafficUrl(code: string, terminal?: string): string {
+  const a = AIRPORTS[code];
+  const t = terminal?.replace(/^T\s*/i, '');
+  const place = [a ? `${a.city} airport ${code}` : `${code} airport`, t && `Terminal ${t}`].filter(Boolean).join(' ');
+  const q = new URLSearchParams({ api: '1', destination: place, travelmode: 'driving' });
+  return `https://www.google.com/maps/dir/?${q.toString()}`;
+}
+
+/**
+ * Taps on the timeline: "Check in" on check-in opening, "Check traffic"
+ * when it's time to leave, "Message a driver" on booking the ride and on
+ * landing.
  */
 export function stepAction(
   s: TimelineStep,
@@ -108,6 +121,10 @@ export function stepAction(
 ): { label: string; url: string } | undefined {
   const day = (d: Date, tz: string) => d.toLocaleDateString(undefined, { weekday: 'short', day: 'numeric', month: 'short', timeZone: tz });
   if (s.kind === 'checkin') return s.link ? { label: 'Check in', url: s.link } : undefined;
+  if (s.kind === 'leave' || s.kind === 'returnLeave') {
+    const f = s.kind === 'returnLeave' ? plan.returnFlight : plan.flight;
+    return f?.airport ? { label: 'Check traffic', url: trafficUrl(f.airport, f.terminal) } : undefined;
+  }
   if (s.kind === 'bookRide') {
     // Each journey's own booking step and leave time, even on the same day.
     const home = !!s.home;

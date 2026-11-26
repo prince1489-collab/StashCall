@@ -29,6 +29,16 @@ describe('ticking off timeline steps', () => {
     expect(stepKey(later.find((s) => s.kind === 'leave')!, later)).toBe(stepKey(find('leave'), steps));
   });
 
+  it('keeps each check-in its own tick when two open on one day, in either order', () => {
+    const at = (h: string) => new Date(`2026-12-04T${h}:00Z`);
+    const ci = (detail: string, h: string) => ({ ...find('checkin'), detail, at: at(h) });
+    const before = [ci('BA142 · British Airways', '01:30'), ci('QP1111 · Akasa Air', '02:30')];
+    const after = [ci('QP1111 · Akasa Air', '00:30'), ci('BA142 · British Airways', '01:30')];
+    const d = toggleStep(data, 't', 'me', before[0], before, 'me');
+    expect(stepDone(d.trips[0], 'me', after[1], after)).toBeDefined();
+    expect(stepDone(d.trips[0], 'me', after[0], after)).toBeUndefined();
+  });
+
   it('says who ticked it', () => {
     const d = { by: 'b', at: '2026-12-06T05:12:00Z' };
     expect(doneLabel(d, data.owners, 'me', 'Asia/Kolkata', new Date('2026-12-06T06:00:00Z'))).toBe('Done by Bajrang · 10:42');
