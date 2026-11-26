@@ -15,6 +15,7 @@ import { useSync } from '../../sync/SyncProvider';
 import { BeforeYouGo } from '../../ui/BeforeYouGo';
 import { PrimaryButton, formatLocalDate } from '../../ui/Form';
 import { ReminderStatus } from '../../ui/ReminderStatus';
+import { BoardingPasses } from '../../ui/BoardingPasses';
 import { RideLinks } from '../../ui/RideLinks';
 import { FamilyStatus } from '../../ui/FamilyStatus';
 import { Tickets } from '../../ui/Tickets';
@@ -221,6 +222,8 @@ function TripDetail({ trip }: { trip: Trip }) {
           {own || !plan.flight ? '' : ' (same as the trip)'}
         </Text>
       ) : null}
+      {/* Boarding passes are for the person holding this phone. */}
+      {(person?.id ?? data.meId) === data.meId ? <BoardingPasses trip={mine} /> : null}
       <Timeline steps={steps} now={now} itemsFor={(s) => stepItemNames(plan, data.items, s, data.owners)} />
       <Text style={styles.sectionHeading}>For everyone</Text>
       <BeforeYouGo trip={mine} />

@@ -96,6 +96,17 @@ describe('family sharing records', () => {
     const r = applyRemote(two, state, asRows([{ kind: 'trip', id: 't1', data: remote, deleted: false }]));
     expect(r.data.trips[0].tickets).toEqual([{ id: 'k2', uri: 'file:///two.jpg', addedAt: 'x' }]);
   });
+
+  it('keeps boarding passes on this phone: never sent, kept when the trip changes elsewhere', () => {
+    const pass = { id: 'p1', uri: 'file:///pass.jpg', addedAt: 'x' };
+    const withPass: AppData = { ...mine, trips: [{ ...trip, passes: [pass] }] };
+    const sent = changesToPush(withPass, {}).find((r) => r.kind === 'trip')!.data as Record<string, unknown>;
+    expect('passes' in sent).toBe(false);
+    const state = markPushed({}, changesToPush(withPass, {}));
+    const r = applyRemote(withPass, state, asRows([{ kind: 'trip', id: 't1', data: { ...sent, name: 'Renamed' }, deleted: false }]));
+    expect(r.data.trips[0].name).toBe('Renamed');
+    expect(r.data.trips[0].passes).toEqual([pass]);
+  });
 });
 
 describe('ticket screenshots', () => {
