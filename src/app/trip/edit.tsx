@@ -184,11 +184,16 @@ export default function EditTrip() {
     [],
   );
 
+  /** True when what was shared was only PDFs, which aren't kept with the trip. */
+  const keptNothing = useRef(false);
+
   /** `problem` says why nothing was read, when the reader itself failed. */
   const applyTicket = (d: TicketDetails, problem?: string) => {
     if (!hasTripDetails(d)) {
       setReadNote(
-        `${problem ?? "Couldn't find a flight or checkout time in that screenshot."} It's kept with the trip; fill in the times below.`,
+        keptNothing.current
+          ? `${problem ?? "Couldn't find a flight or checkout time in that PDF."} Fill in the times below.`
+          : `${problem ?? "Couldn't find a flight or checkout time in that screenshot."} It's kept with the trip; fill in the times below.`,
       );
       return;
     }
@@ -232,7 +237,7 @@ export default function EditTrip() {
       setHasReturn(true);
       setReturnFlight(read(personId, 'returnFlight', draft.returnFlight));
     }
-    setReadNote(`Filled in from your screenshot: ${describeTicket(d, formatLocalDate)}. Check the times before saving.`);
+    setReadNote(`Filled in from your ${keptNothing.current ? 'PDF' : 'screenshot'}: ${describeTicket(d, formatLocalDate)}. Check the times before saving.`);
   };
 
   useEffect(() => {
@@ -263,12 +268,14 @@ export default function EditTrip() {
     }
   }, [personId]); // eslint-disable-line react-hooks/exhaustive-deps
 
-  // A screenshot shared to StashCall arrives already read.
+  // Screenshots and PDFs shared to StashCall arrive already read. PDFs are
+  // read but not kept, so a PDF-only share has details and no tickets.
   useEffect(() => {
-    const shared = fromJson<Ticket[]>(params.tickets);
-    if (!shared?.length) return;
-    setAdded(shared);
+    const shared = fromJson<Ticket[]>(params.tickets) ?? [];
     const details = fromJson<TicketDetails | TicketDetails[]>(params.details);
+    if (shared.length === 0 && !details) return;
+    setAdded(shared);
+    keptNothing.current = shared.length === 0;
     applyTickets(Array.isArray(details) ? details : [details ?? {}], params.problem);
     if (params.text) setReadText(params.text);
     followPassenger(params.text);
@@ -319,7 +326,7 @@ export default function EditTrip() {
       s.returnFlight && `home ${route(s.returnFlight)}`,
     ].filter(Boolean);
     const between = s.between.length > 0 ? ` ${s.between.length === 1 ? 'One flight' : `${s.between.length} flights`} in between can't be planned yet.` : '';
-    setReadNote(`Read ${useful.length} screenshots: ${parts.join(', ')}.${between} Check the times before saving.`);
+    setReadNote(`Read ${useful.length} bookings: ${parts.join(', ')}.${between} Check the times before saving.`);
   };
 
   /**
