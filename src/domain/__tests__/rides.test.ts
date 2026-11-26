@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import { driverMessage, fillMessage, rideFrom, rideTo, trafficUrl, uberUrl, whatsappUrl } from '../rides';
 import type { FlightLeg } from '../types';
+import { terminalPin } from '../airportPins';
 
 const qp = { departure: '2026-12-06T07:00', timeZone: 'Asia/Kolkata', airport: 'BOM', destination: 'PGH', flightNumber: 'QP1111', terminal: 'T2' } as FlightLeg;
 
@@ -32,6 +33,13 @@ describe('rides', () => {
     expect(whatsappUrl('Hi & bye')).toBe('https://wa.me/?text=Hi%20%26%20bye');
     expect(uberUrl('Mumbai airport (BOM)')).toContain('dropoff%5Bnickname%5D=Mumbai+airport+%28BOM%29');
     expect(uberUrl()).not.toContain('dropoff');
+    const pin = terminalPin('BOM', 'T2');
+    expect(uberUrl('Mumbai airport (BOM), Terminal 2', pin)).toContain('dropoff%5Blatitude%5D=19.097591&dropoff%5Blongitude%5D=72.874558');
+    // Another Mumbai terminal, or no terminal: no guessing.
+    expect(terminalPin('BOM', 'T1')).toBeUndefined();
+    expect(terminalPin('BOM')).toBeUndefined();
+    expect(terminalPin('PGH')).toEqual({ lat: 29.033755, lng: 79.468833 });
+    expect(terminalPin('UDR', 'T1')).toEqual({ lat: 24.61835, lng: 73.89845 });
   });
 });
 
