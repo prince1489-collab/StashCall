@@ -39,4 +39,15 @@ describe('corporate e-ticket PDFs', () => {
   it('takes a flight home from another city as the way home', () => {
     expect(isReturnOf(flightLeg(out, 'Asia/Kolkata'), back)).toBe(true);
   });
+
+  it('keeps a later itinerary after the small print', () => {
+    const d = parseTicketText(['BA137 LHR BOM\nDeparts 5 Feb 2027 09:40\nTerms and conditions\nFare conditions apply\nBA138 BOM LHR\nDeparts 19 Feb 2027 02:15'], today);
+    expect(d.departure).toBe('2027-02-05T09:40');
+    expect(d.returnFlight?.departure).toBe('2027-02-19T02:15');
+  });
+
+  it('drops only the issue date, not a departure on the same line', () => {
+    const d = parseTicketText(['BA138 BOM LHR\n19 Feb 2027 Issue date: 01 Feb 2027 Departure: 02:15'], today);
+    expect(d.departure).toBe('2027-02-19T02:15');
+  });
 });
