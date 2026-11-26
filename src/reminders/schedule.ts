@@ -141,7 +141,7 @@ export async function syncReminders(plan: PlannedReminder[], tripIds: string[]):
         priority: Notifications.AndroidNotificationPriority.MAX,
         // Stays until "Done", "In 15 min" or a tap, like an alarm.
         sticky: true,
-        data: { kind: r.kind, tripId: r.tripId },
+        data: { kind: r.kind, tripId: r.tripId, ...(r.url && { url: r.url }) },
         categoryIdentifier: r.hasItems ? CATEGORY_ITEMS : CATEGORY_PLAIN,
       },
       trigger: {
