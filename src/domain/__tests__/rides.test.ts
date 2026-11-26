@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { driverMessage, fillMessage, rideFrom, rideTo, uberUrl, whatsappUrl } from '../rides';
+import { driverMessage, fillMessage, rideFrom, rideTo, trafficUrl, uberUrl, whatsappUrl } from '../rides';
 import type { FlightLeg } from '../types';
 
 const qp = { departure: '2026-12-06T07:00', timeZone: 'Asia/Kolkata', airport: 'BOM', destination: 'PGH', flightNumber: 'QP1111', terminal: 'T2' } as FlightLeg;
@@ -32,5 +32,12 @@ describe('rides', () => {
     expect(whatsappUrl('Hi & bye')).toBe('https://wa.me/?text=Hi%20%26%20bye');
     expect(uberUrl('Mumbai airport (BOM)')).toContain('dropoff%5Bnickname%5D=Mumbai+airport+%28BOM%29');
     expect(uberUrl()).not.toContain('dropoff');
+  });
+});
+
+describe('traffic', () => {
+  it('opens Google Maps driving to the departure terminal', () => {
+    expect(trafficUrl('BOM', 'T2')).toBe('https://www.google.com/maps/dir/?api=1&destination=Mumbai+airport+BOM+Terminal+2&travelmode=driving');
+    expect(trafficUrl('PGH')).toContain('destination=Pantnagar+airport+PGH&');
   });
 });
