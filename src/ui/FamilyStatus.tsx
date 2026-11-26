@@ -16,7 +16,7 @@ const time = (d: Date) => `${String(d.getHours()).padStart(2, '0')}:${String(d.g
 export function FamilyStatus({ trip, now }: { trip: Trip; now: Date }) {
   const { data, update } = useAppData();
   const going = travellers(trip, data.owners);
-  if (going.length < 2 || !showStatus(trip, now)) return null;
+  if (going.length < 2 || !showStatus(trip, going, now)) return null;
   const me = going.find((p) => p.id === data.meId);
   const mine = me && statusOn(me, trip.id, now);
   return (

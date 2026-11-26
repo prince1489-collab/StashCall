@@ -1,7 +1,8 @@
 import { describe, expect, it } from 'vitest';
+import { defaultFlight } from '../timeline';
 import { EMPTY_DATA } from '../../storage/store';
-import { newStatuses, setStatus, statusOn } from '../status';
-import type { Person } from '../types';
+import { newStatuses, setStatus, showStatus, statusOn } from '../status';
+import type { Person, Trip } from '../types';
 
 const now = new Date('2026-12-06T04:00:00Z');
 const people: Person[] = [
@@ -24,5 +25,18 @@ describe('family status', () => {
     expect(newStatuses(people, after, 'm', now)).toEqual(['Bajrang has left for the airport']);
     // The same update again says nothing.
     expect(newStatuses(after, after, 'm', now)).toEqual([]);
+  });
+});
+
+describe('when the card shows', () => {
+  it("covers each traveller's own flights", () => {
+    const trip = {
+      id: 't1', name: 'x', createdAt: '', travellerIds: ['m', 'b'],
+      flight: defaultFlight('2026-12-06T07:00', 'Asia/Kolkata', false),
+      personFlights: { b: { flight: defaultFlight('2026-12-12T07:00', 'Asia/Kolkata', false) } },
+    } as unknown as Trip;
+    const on = new Date('2026-12-12T00:00:00Z');
+    expect(showStatus(trip, [], on)).toBe(false);
+    expect(showStatus(trip, people, on)).toBe(true);
   });
 });

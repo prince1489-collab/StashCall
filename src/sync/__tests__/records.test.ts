@@ -122,3 +122,18 @@ describe('ticket screenshots', () => {
     expect(out?.data).toMatchObject({ name: 'Pantnagar trip', tickets: [{ id: 'k' }] });
   });
 });
+
+describe('people changed on two phones', () => {
+  it("keeps Dad's travel update and my edit to his passport date", () => {
+    const dad = { id: 'b', name: 'Bajrang' };
+    const base: AppData = { ...EMPTY_DATA, owners: [dad] };
+    const state = markPushed({}, changesToPush(base, {}));
+    // Here: I set his passport date. There: he says he's left.
+    const here: AppData = { ...base, owners: [{ ...dad, passportExpires: '2030-01-01' }] };
+    const status = { tripId: 't1', step: 'left' as const, at: '2026-12-06T00:30:00Z' };
+    const r = applyRemote(here, state, asRows([{ kind: 'person', id: 'b', data: { ...dad, status }, deleted: false }]));
+    expect(r.data.owners[0]).toEqual({ ...dad, passportExpires: '2030-01-01', status });
+    // The merged record goes back to the server.
+    expect(changesToPush(r.data, r.state).map((x) => x.data)).toEqual([{ ...dad, passportExpires: '2030-01-01', status }]);
+  });
+});
