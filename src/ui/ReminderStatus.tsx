@@ -77,9 +77,10 @@ export function ReminderStatus({ problemsOnly = false }: { problemsOnly?: boolea
 const styles = StyleSheet.create({
   card: {
     backgroundColor: colors.card,
-    borderRadius: 12,
+    borderRadius: 16,
     padding: space.l,
     marginTop: space.l,
+    marginBottom: space.l,
     borderWidth: StyleSheet.hairlineWidth,
     borderColor: colors.border,
     gap: space.s,

@@ -1,6 +1,7 @@
 import Constants from 'expo-constants';
 import { router } from 'expo-router';
-import { Alert, ScrollView, StyleSheet, Text } from 'react-native';
+import { Alert, Pressable, ScrollView, StyleSheet, Text } from 'react-native';
+import type { ReactNode } from 'react';
 
 import { sendFeedback } from '../feedback/sendFeedback';
 import { useAppData } from '../state/AppData';
@@ -40,21 +41,21 @@ export default function Settings() {
       <ReminderStatus />
 
       <Section title="Family sharing">
-        <Text style={styles.action} onPress={() => router.push('/household')} accessibilityRole="button">
+        <Nav onPress={() => router.push('/household')}>
           Share trips with the people you travel with
-        </Text>
+        </Nav>
       </Section>
 
       <Section title="Driver message">
-        <Text style={styles.action} onPress={() => router.push('/driver-message')} accessibilityRole="button">
+        <Nav onPress={() => router.push('/driver-message')}>
           {data.driverTemplates?.toAirport || data.driverTemplates?.fromAirport ? 'Your own message' : 'Write your own, in any language'}
-        </Text>
+        </Nav>
       </Section>
 
       <Section title="People">
-        <Text style={styles.action} onPress={() => router.push('/people')} accessibilityRole="button">
+        <Nav onPress={() => router.push('/people')}>
           {data.owners.length > 0 ? data.owners.map((p) => p.name).join(', ') : 'Add the people you travel with'}
-        </Text>
+        </Nav>
       </Section>
 
       <Section title="Travel insurance">
@@ -87,9 +88,9 @@ export default function Settings() {
 
       <Section title="Passport">
         {data.owners.length > 0 ? (
-          <Text style={styles.action} onPress={() => router.push('/people')} accessibilityRole="button">
+          <Nav onPress={() => router.push('/people')}>
             Each person's passport date is on People
-          </Text>
+          </Nav>
         ) : (
         <Text
           style={styles.option}
@@ -118,9 +119,9 @@ export default function Settings() {
       </Section>
 
       <Section title="Tester feedback">
-        <Text style={styles.action} onPress={sendFeedback} accessibilityRole="button">
+        <Nav onPress={sendFeedback}>
           Send feedback
-        </Text>
+        </Nav>
       </Section>
 
       <Text style={styles.version}>StashCall {Constants.expoConfig?.version ?? ''} · tester build</Text>
@@ -128,7 +129,20 @@ export default function Settings() {
   );
 }
 
+/** A row that opens another screen: label, then a chevron. */
+function Nav({ onPress, children }: { onPress: () => void; children: ReactNode }) {
+  return (
+    <Pressable style={styles.nav} onPress={onPress} accessibilityRole="button">
+      <Text style={styles.navText}>{children}</Text>
+      <Text style={styles.chevron}>›</Text>
+    </Pressable>
+  );
+}
+
 const styles = StyleSheet.create({
+  nav: { flexDirection: 'row', alignItems: 'center', padding: space.l, gap: space.s },
+  navText: { flex: 1, fontSize: 16, color: colors.accent, fontWeight: '600' },
+  chevron: { fontSize: 22, color: colors.muted, lineHeight: 22 },
   container: { padding: space.l, paddingBottom: 48 },
   heading: { fontSize: 13, fontWeight: '600', color: colors.muted, textTransform: 'uppercase', marginLeft: space.xs },
   action: { fontSize: 16, color: colors.accent, fontWeight: '600', padding: space.l },
