@@ -4,6 +4,7 @@ import { Pressable, ScrollView, Share, StyleSheet, Text, View } from 'react-nati
 
 import { isGoing, travellers, tripFor } from '../../domain/people';
 import { tripChecklistText } from '../../domain/shareText';
+import { doneLabel, stepDone, toggleStep } from '../../domain/stepsDone';
 import { buildTimeline } from '../../domain/timeline';
 import { journeyFlights } from '../../domain/journeys';
 import { formatTripDays, pastTrips, tripSpan, upcomingTrips } from '../../domain/trips';
@@ -13,8 +14,7 @@ import { useNow } from '../../hooks/useNow';
 import { useAppData } from '../../state/AppData';
 import { useSync } from '../../sync/SyncProvider';
 import { BeforeYouGo } from '../../ui/BeforeYouGo';
-import { PrimaryButton, formatLocalDate } from '../../ui/Form';
-import { ReminderStatus } from '../../ui/ReminderStatus';
+import { PrimaryButton, deviceZone, formatLocalDate } from '../../ui/Form';
 import { BoardingPasses } from '../../ui/BoardingPasses';
 import { JourneyRides, stepAction } from '../../ui/RideLinks';
 import { FamilyStatus } from '../../ui/FamilyStatus';
@@ -84,7 +84,7 @@ function TripList() {
   return (
     <ScrollView contentContainerStyle={styles.container}>
       <View style={styles.header}>
-        <Text style={styles.title}>Your trips</Text>
+        <Text style={[styles.title, { flex: 1 }]}>Your trips</Text>
         <Link href={{ pathname: '/trip/edit', params: { new: '1' } }} style={styles.edit} accessibilityRole="button">
           New trip
         </Link>
@@ -148,7 +148,7 @@ function TripRow({ trip, meta, who, onPress, past }: { trip: Trip; meta: string;
  * plan: their route, connections and day, on this phone's person first.
  */
 function TripDetail({ trip }: { trip: Trip }) {
-  const { data, viewTrip } = useAppData();
+  const { data, viewTrip, update } = useAppData();
   const now = useNow();
   const going = travellers(trip, data.owners);
   const [pid, setPid] = useState(() => (going.some((p) => p.id === data.meId) ? data.meId : going[0]?.id));
@@ -157,6 +157,8 @@ function TripDetail({ trip }: { trip: Trip }) {
   const mine = tripFor(trip, data.meId);
   const own = person && trip.personFlights?.[person.id] !== undefined;
   const steps = buildTimeline(plan);
+  // Whose plan this is: ticks on it are theirs, whoever taps them.
+  const planId = person?.id ?? data.meId;
   // Ride links are for the person holding this phone.
   const isMe = (person?.id ?? data.meId) === data.meId;
   const share = () =>
@@ -169,20 +171,23 @@ function TripDetail({ trip }: { trip: Trip }) {
           ‹ All trips
         </Text>
       ) : null}
-      <View style={styles.header}>
-        <Text style={styles.title}>{trip.name}</Text>
-        <Link href="/trip/edit" style={styles.edit} accessibilityRole="button">
-          Edit
-        </Link>
-        {data.trips.length > 1 ? null : (
-          <Link href={{ pathname: '/trip/edit', params: { new: '1' } }} style={styles.edit} accessibilityRole="button">
-            New trip
-          </Link>
-        )}
-      </View>
+      <Text style={styles.title}>{trip.name}</Text>
       <Text style={styles.note}>
         {[days, goingNames(trip, data.owners)].filter(Boolean).join(' · ')}
       </Text>
+      <View style={styles.actions}>
+        <Link href="/trip/edit" style={styles.action} accessibilityRole="button">
+          Edit trip
+        </Link>
+        {data.trips.length > 1 ? null : (
+          <Link href={{ pathname: '/trip/edit', params: { new: '1' } }} style={styles.action} accessibilityRole="button">
+            New trip
+          </Link>
+        )}
+        <Text style={styles.action} onPress={share} accessibilityRole="button">
+          Share checklist
+        </Text>
+      </View>
       <SharedWith />
       <FamilyStatus trip={trip} now={now} />
       {going.length > 1 ? (
@@ -206,38 +211,44 @@ function TripDetail({ trip }: { trip: Trip }) {
           </View>
         </View>
       ) : null}
-      {plan.flight ? <Journey label="Getting there" f={plan.flight} lead /> : null}
-      {plan.flight && isMe ? <JourneyRides f={plan.flight} leave={steps.find((s) => s.kind === 'leave')} home={false} /> : null}
-      {plan.returnFlight ? <Journey label="Coming home" f={plan.returnFlight} /> : null}
-      {plan.returnFlight && isMe ? (
-        <JourneyRides f={plan.returnFlight} leave={steps.find((s) => s.kind === 'returnLeave')} home />
-      ) : null}
       {person && going.length > 1 ? (
         <Text
-          style={styles.share}
+          style={styles.editFlights}
           onPress={() => router.push({ pathname: '/trip/edit', params: { person: person.id } })}
           accessibilityRole="button"
         >
           {plan.flight ? `Edit ${person.name}'s flights` : `Add ${person.name}'s flights`}
-          {own || !plan.flight ? '' : ' (same as the trip)'}
+          {own || !plan.flight ? '' : ' (same as the trip)'} ›
         </Text>
       ) : null}
-      {/* Boarding passes are for the person holding this phone. */}
-      {(person?.id ?? data.meId) === data.meId ? <BoardingPasses trip={mine} /> : null}
+      {plan.flight ? (
+        <Journey label="Getting there" f={plan.flight} lead>
+          {isMe ? <JourneyRides f={plan.flight} leave={steps.find((s) => s.kind === 'leave')} home={false} dark /> : null}
+        </Journey>
+      ) : null}
+      {plan.returnFlight ? (
+        <Journey label="Coming home" f={plan.returnFlight}>
+          {isMe ? <JourneyRides f={plan.returnFlight} leave={steps.find((s) => s.kind === 'returnLeave')} home /> : null}
+        </Journey>
+      ) : null}
+      <Text style={styles.sectionHeading}>Day by day</Text>
       <Timeline
         steps={steps}
         now={now}
         itemsFor={(s) => stepItemNames(plan, data.items, s, data.owners)}
         actionFor={isMe ? (s) => stepAction(s, steps, plan, data.driverTemplates) : undefined}
+        doneFor={(s) => {
+          const d = stepDone(trip, planId, s, steps);
+          return d ? doneLabel(d, data.owners, data.meId, deviceZone(), now) : undefined;
+        }}
+        onToggle={planId ? (s) => update((d) => toggleStep(d, trip.id, planId, s, steps, data.meId)) : undefined}
       />
-      <Text style={styles.sectionHeading}>For everyone</Text>
-      <BeforeYouGo trip={mine} />
+      <Text style={styles.sectionHeading}>Documents</Text>
+      {/* Boarding passes are for the person holding this phone. */}
+      {isMe ? <BoardingPasses trip={mine} /> : null}
       <Tickets trip={mine} />
-      <ReminderStatus />
-      <Text style={styles.share} onPress={share} accessibilityRole="button">
-        Share checklist
-      </Text>
-      <Text style={styles.note}>
+      <BeforeYouGo trip={mine} />
+      <Text style={styles.footnote}>
         Estimates are worked out from your flight or checkout time. Tap Edit to change any assumption.
       </Text>
     </ScrollView>
@@ -248,7 +259,7 @@ function TripDetail({ trip }: { trip: Trip }) {
  * One journey, however many flights it takes: the route on top, then each
  * flight with its time, number and terminal.
  */
-function Journey({ label, f, lead }: { label: string; f: NonNullable<Trip['flight']>; lead?: boolean }) {
+function Journey({ label, f, lead, children }: { label: string; f: NonNullable<Trip['flight']>; lead?: boolean; children?: React.ReactNode }) {
   const flights = journeyFlights(f);
   return (
     <View style={[styles.journey, lead && styles.journeyLead]}>
@@ -267,6 +278,7 @@ function Journey({ label, f, lead }: { label: string; f: NonNullable<Trip['fligh
           </Text>
         </View>
       ))}
+      {children}
     </View>
   );
 }
@@ -312,7 +324,7 @@ const styles = StyleSheet.create({
   pastToggle: { fontSize: 15, color: colors.accent, fontWeight: '600', paddingVertical: space.m, marginTop: space.s },
   plans: { marginTop: space.m, gap: space.s },
   planChips: { flexDirection: 'row', flexWrap: 'wrap', gap: space.s },
-  sectionHeading: { fontSize: 12, fontWeight: '600', letterSpacing: 0.8, textTransform: 'uppercase', color: colors.muted, marginTop: space.xl },
+  sectionHeading: { fontSize: 12, fontWeight: '600', letterSpacing: 0.8, textTransform: 'uppercase', color: colors.muted, marginTop: space.xl, marginBottom: space.xs },
   journey: { backgroundColor: colors.card, borderRadius: 20, borderWidth: StyleSheet.hairlineWidth, borderColor: colors.border, padding: space.l, marginTop: space.m, gap: 6 },
   journeyLead: { backgroundColor: colors.accent, borderColor: colors.accent },
   journeyLabel: { fontSize: 12, fontWeight: '600', letterSpacing: 0.8, textTransform: 'uppercase', color: colors.muted },
@@ -332,7 +344,20 @@ const styles = StyleSheet.create({
   whoHeading: { fontSize: 12, fontWeight: '600', letterSpacing: 0.8, textTransform: 'uppercase', color: colors.muted },
   container: { padding: space.l, paddingBottom: 48 },
   header: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' },
-  title: { fontSize: 26, fontFamily: fonts.display, color: colors.text, flex: 1 },
+  title: { fontSize: 28, lineHeight: 34, fontFamily: fonts.display, color: colors.text },
+  actions: { flexDirection: 'row', flexWrap: 'wrap', gap: space.s, marginTop: space.m },
+  action: {
+    fontSize: 14,
+    fontFamily: fonts.bold,
+    color: colors.accent,
+    backgroundColor: colors.accentSoft,
+    borderRadius: 16,
+    overflow: 'hidden',
+    paddingHorizontal: space.m,
+    paddingVertical: 7,
+  },
+  editFlights: { fontSize: 14, color: colors.accent, fontWeight: '600', marginTop: space.s },
+  footnote: { fontSize: 13, color: colors.muted, marginTop: space.l, textAlign: 'center' },
   edit: { fontSize: 16, color: colors.accent, fontWeight: '600', padding: space.s },
   share: { fontSize: 16, color: colors.accent, fontWeight: '600', paddingVertical: space.m },
   note: { fontSize: 14, color: colors.muted, marginTop: space.xs },

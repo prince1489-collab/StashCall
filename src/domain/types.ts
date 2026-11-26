@@ -154,7 +154,19 @@ export interface Trip {
   visaExpires?: LocalDate;
   /** Item ids ticked off, keyed by timeline step kind. */
   ticked: Partial<Record<StepKind, string[]>>;
+  /** Timeline steps ticked off, keyed by "personId|step" (see domain/stepsDone). */
+  stepsDone?: Record<string, StepDone>;
   createdAt: string;
+}
+
+/** A step ticked off: who tapped it and when. */
+export interface StepDone {
+  /** Person id of whoever ticked it, if this phone knows who it is. */
+  by?: string;
+  /** ISO instant of the last tap, ticking or unticking. */
+  at: string;
+  /** Unticked again. Kept so it beats an older tick from another phone. */
+  undone?: true;
 }
 
 /**
@@ -219,4 +231,6 @@ export interface TimelineStep {
   detail?: string;
   /** A web page for the step, like the airline's check-in. */
   link?: string;
+  /** True for steps of the journey home. */
+  home?: boolean;
 }

@@ -1,3 +1,4 @@
+import { zonedToInstant } from './time';
 import { AIRPORTS, type Airport } from './airports';
 import type { LocalDateTime } from './types';
 
@@ -245,7 +246,7 @@ function columnFlights(text: string, today: Date): FlightDetails[] | undefined {
     if (a) f.from = a;
     if (b) f.to = b;
     if (from[i]?.terminal) f.terminal = `T${from[i].terminal}`;
-    if (landings.length === n) f.arrival = arrivalAfter(f.departure!, landings[i].value);
+    if (landings.length === n) f.arrival = arrivalAfter(f.departure!, landings[i].value, undefined, undefined, { from: f.from?.timeZone, to: f.to?.timeZone });
     return f;
   });
 }
@@ -330,14 +331,34 @@ export interface FlightDetails {
   terminal?: string;
 }
 
-/** A landing time after `departure`: the same day, or the next when it's earlier on the clock. */
-function arrivalAfter(departure: LocalDateTime, time: string, day?: Day, today?: Date): LocalDateTime {
+/**
+ * A landing time with no date of its own: the first day on which it comes
+ * after take-off, judged in each airport's own time zone when we know them,
+ * so a flight west that lands "earlier" on the clock stays on the same day.
+ */
+function arrivalAfter(
+  departure: LocalDateTime,
+  time: string,
+  day?: Day,
+  today?: Date,
+  zones?: { from?: string; to?: string },
+): LocalDateTime {
   if (day && today) return local(withYear(day, today), time);
   const date = departure.slice(0, 10);
-  if (time >= departure.slice(11, 16)) return `${date}T${time}`;
-  const next = new Date(`${date}T00:00:00Z`);
-  next.setUTCDate(next.getUTCDate() + 1);
-  return `${next.toISOString().slice(0, 10)}T${time}`;
+  const shift = (n: number) => {
+    const d = new Date(`${date}T00:00:00Z`);
+    d.setUTCDate(d.getUTCDate() + n);
+    return `${d.toISOString().slice(0, 10)}T${time}`;
+  };
+  if (zones?.from && zones.to) {
+    const off = zonedToInstant(departure, zones.from).getTime();
+    for (const n of [-1, 0, 1, 2]) {
+      const at = zonedToInstant(shift(n), zones.to).getTime();
+      // Flights take under a day; the first landing after take-off.
+      if (at > off) return shift(n);
+    }
+  }
+  return time >= departure.slice(11, 16) ? shift(0) : shift(1);
 }
 
 /** Airline codes that contain a digit: IndiGo, Go First, AirAsia India, easyJet, Wizz, JetBlue, Frontier, Cebu, Jet. */
@@ -400,7 +421,7 @@ function parseFlight(flightText: string, today: Date): FlightDetails {
       )[0];
       if (after) {
         const day = dates.filter((d) => d.index > time.index && d.end <= after.index).pop();
-        details.arrival = arrivalAfter(details.departure, after.value, day?.value, today);
+        details.arrival = arrivalAfter(details.departure, after.value, day?.value, today, { from: details.from?.timeZone, to: details.to?.timeZone });
       }
     }
   }

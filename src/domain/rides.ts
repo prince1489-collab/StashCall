@@ -1,5 +1,7 @@
 import { AIRPORTS } from './airports';
-import type { FlightLeg } from './types';
+import { addMinutes, timeLabel } from './time';
+import { EXIT_MINUTES } from './timeline';
+import type { FlightLeg, TimelineStep, Trip } from './types';
 
 /**
  * Getting a ride to and from the airport: a message to send a driver, and a
@@ -92,4 +94,36 @@ export function rideFrom(f: FlightLeg, pickup: { day: string; time: string }, pl
     flight: last ? last.flightNumber : f.flightNumber,
     flightTime: f.lands.slice(11, 16),
   };
+}
+
+/**
+ * Taps on the timeline: "Check in" on check-in opening, "Message a driver"
+ * on booking the ride and on landing.
+ */
+export function stepAction(
+  s: TimelineStep,
+  steps: TimelineStep[],
+  plan: Pick<Trip, 'flight' | 'returnFlight'>,
+  templates: { toAirport?: string; fromAirport?: string } | undefined,
+): { label: string; url: string } | undefined {
+  const day = (d: Date, tz: string) => d.toLocaleDateString(undefined, { weekday: 'short', day: 'numeric', month: 'short', timeZone: tz });
+  if (s.kind === 'checkin') return s.link ? { label: 'Check in', url: s.link } : undefined;
+  if (s.kind === 'bookRide') {
+    // Each journey's own booking step and leave time, even on the same day.
+    const home = !!s.home;
+    const leave = steps.find((x) => x.kind === (home ? 'returnLeave' : 'leave'));
+    const f = home ? plan.returnFlight : plan.flight;
+    if (!f || !leave) return undefined;
+    const ride = rideTo(f, { day: day(leave.at, leave.timeZone), time: leave.localTime }, home ? 'hotel' : 'home');
+    return { label: 'Message a driver', url: whatsappUrl(driverMessage(ride, templates?.toAirport)) };
+  }
+  if (s.kind === 'land') {
+    const home = !!s.home;
+    const f = home ? plan.returnFlight : plan.flight;
+    if (!f) return undefined;
+    const pickup = addMinutes(s.at, EXIT_MINUTES);
+    const ride = rideFrom(f, { day: day(pickup, s.timeZone), time: timeLabel(pickup, s.timeZone) }, home ? 'home' : 'hotel');
+    return ride ? { label: 'Message a driver', url: whatsappUrl(driverMessage(ride, templates?.fromAirport, true)) } : undefined;
+  }
+  return undefined;
 }

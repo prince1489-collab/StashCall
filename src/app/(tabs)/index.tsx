@@ -5,6 +5,7 @@ import { Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
 import { openChecklistStep, toggleTick } from '../../domain/checklist';
 import { savedItems } from '../../domain/household';
 import { instantToZoned } from '../../domain/time';
+import { stepDone } from '../../domain/stepsDone';
 import { buildTimeline } from '../../domain/timeline';
 import { itemCountLabel, stepItemNames, stepItems } from '../../domain/tripItems';
 import { useNow } from '../../hooks/useNow';
@@ -77,7 +78,8 @@ export default function Today() {
   }
 
   const steps = buildTimeline(currentTrip);
-  const upcoming = steps.filter((s) => s.at.getTime() >= now.getTime());
+  // Steps already ticked off aren't "next".
+  const upcoming = steps.filter((s) => s.at.getTime() >= now.getTime() && !stepDone(currentTrip, data.meId, s, steps));
   const open = openChecklistStep(steps, now);
   const openItems = open ? stepItems(currentTrip, data.items, open, data.owners) : [];
   const trip = currentTrip;

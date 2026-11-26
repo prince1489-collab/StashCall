@@ -414,6 +414,14 @@ describe('misread flight numbers', () => {
   });
 });
 
+describe('landing dates', () => {
+  it('keeps a flight west across time zones on the same day', () => {
+    const d = parseTicketText(['JL16 HND LAX', '5 Dec 2026', 'Departs 17:00', 'Arrives 10:00'], today);
+    expect(d.departure).toBe('2026-12-05T17:00');
+    expect(d.arrival).toBe('2026-12-05T10:00');
+  });
+});
+
 describe('cities and codes', () => {
   it('keeps the airport code a ticket gives for a city', () => {
     const d = parseTicketText(['London (LGW) to Paris (ORY)', 'Flight AF1234', '5 Feb 2027', 'Departs 09:40'], today);

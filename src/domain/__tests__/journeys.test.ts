@@ -88,3 +88,18 @@ describe('landing and the ride on', () => {
     expect(at('bookRide')).toHaveLength(1);
   });
 });
+
+describe('ride steps on a day with flights both ways', () => {
+  it('books each ride for its own journey', async () => {
+    const { buildTimeline, defaultFlight } = await import('../timeline');
+    const { stepAction } = await import('../rides');
+    const out = { ...defaultFlight('2026-12-06T07:00', 'Asia/Kolkata', false), airport: 'BOM', destination: 'DEL' };
+    const back = { ...defaultFlight('2026-12-06T20:00', 'Asia/Kolkata', false), airport: 'DEL', destination: 'BOM', travelMinutes: 60 };
+    const plan = { flight: out, returnFlight: back };
+    const steps = buildTimeline(plan);
+    const msgs = steps.filter((s) => s.kind === 'bookRide').map((s) => decodeURIComponent(stepAction(s, steps, plan, undefined)!.url));
+    expect(msgs[0]).toContain('from home');
+    expect(msgs[1]).toContain('from the hotel');
+    expect(msgs[1]).toContain('Delhi airport (DEL)');
+  });
+});
