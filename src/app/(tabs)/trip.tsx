@@ -16,6 +16,7 @@ import { BeforeYouGo } from '../../ui/BeforeYouGo';
 import { PrimaryButton, formatLocalDate } from '../../ui/Form';
 import { ReminderStatus } from '../../ui/ReminderStatus';
 import { BoardingPasses } from '../../ui/BoardingPasses';
+import { RideLinks } from '../../ui/RideLinks';
 import { FamilyStatus } from '../../ui/FamilyStatus';
 import { Tickets } from '../../ui/Tickets';
 import { Timeline } from '../../ui/Timeline';
@@ -156,6 +157,8 @@ function TripDetail({ trip }: { trip: Trip }) {
   const mine = tripFor(trip, data.meId);
   const own = person && trip.personFlights?.[person.id] !== undefined;
   const steps = buildTimeline(plan);
+  // Ride links are for the person holding this phone.
+  const isMe = (person?.id ?? data.meId) === data.meId;
   const share = () =>
     Share.share({ message: tripChecklistText(mine, data.items, data.owners, formatLocalDate) }).catch(() => {});
   const days = formatTripDays(plan, now.getFullYear());
@@ -204,7 +207,11 @@ function TripDetail({ trip }: { trip: Trip }) {
         </View>
       ) : null}
       {plan.flight ? <Journey label="Getting there" f={plan.flight} lead /> : null}
+      {plan.flight && isMe ? <RideLinks f={plan.flight} leave={steps.find((s) => s.kind === 'leave')} from="home" /> : null}
       {plan.returnFlight ? <Journey label="Coming home" f={plan.returnFlight} /> : null}
+      {plan.returnFlight && isMe ? (
+        <RideLinks f={plan.returnFlight} leave={steps.find((s) => s.kind === 'returnLeave')} from="hotel" />
+      ) : null}
       {person && going.length > 1 ? (
         <Text
           style={styles.share}
