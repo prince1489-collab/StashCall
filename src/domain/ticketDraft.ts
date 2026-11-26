@@ -53,6 +53,7 @@ export function flightLeg(
         ...(c.from && { airport: c.from.code }),
         ...(c.to && { destination: c.to.code }),
         ...(c.terminal && { terminal: c.terminal }),
+        ...(c.arrival && { arrives: c.arrival }),
       }),
     );
   return {
@@ -63,6 +64,8 @@ export function flightLeg(
     ...(f.flightNumber && { flightNumber: f.flightNumber }),
     ...(f.terminal && { terminal: f.terminal }),
     ...(connections.length > 0 && { connections }),
+    // With a connection to catch, when the first flight lands matters too.
+    ...(connections.length > 0 && f.arrival && { arrives: f.arrival }),
     // The journey lands when its last flight does.
     ...(lastArrival(f) && { lands: lastArrival(f) }),
   };

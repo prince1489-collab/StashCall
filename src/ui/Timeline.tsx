@@ -8,7 +8,7 @@ import { formatLocalDate, zoneLabel } from './Form';
 import { colors, fonts, space } from './theme';
 
 /** The fixed points of the day, shown a little stronger than the steps around them. */
-const KEY_STEPS: StepKind[] = ['takeoff', 'connection', 'returnTakeoff', 'returnConnection', 'land', 'checkout'];
+const KEY_STEPS: StepKind[] = ['takeoff', 'connection', 'returnTakeoff', 'returnConnection', 'land', 'midLand', 'checkout'];
 
 /**
  * The trip, day by day: one card per day, one row per step. Reminder

@@ -89,6 +89,8 @@ export interface FlightLeg {
   connections?: Connection[];
   /** When the journey's last flight lands, in the destination's time zone. */
   lands?: LocalDateTime;
+  /** With connections: when this first flight lands at the connecting airport, in its time. */
+  arrives?: LocalDateTime;
   /** Airport to the hotel (on the way there) or home (on the way back). */
   onwardMinutes?: number;
 }
@@ -103,6 +105,8 @@ export interface Connection {
   airport?: string;
   destination?: string;
   terminal?: string;
+  /** When this flight lands, in its arrival airport's time. */
+  arrives?: LocalDateTime;
 }
 
 export interface HotelCheckout {
@@ -214,6 +218,7 @@ export type StepKind =
   | 'checkin'
   | 'bookRide'
   | 'land'
+  | 'midLand'
   | 'arrive';
 
 export interface TimelineStep {
