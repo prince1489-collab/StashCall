@@ -51,4 +51,17 @@ describe('drive times from the map', () => {
     expect(dads.trip.flight?.travelMinutes).toBe(60);
     expect(dads.trip.personFlights?.dad.flight?.travelMinutes).toBe(dads.changes[0].minutes);
   });
+
+  it('keeps someone else on the trip’s flights from moving to fit this home', () => {
+    const people = [{ id: 'me', name: 'Me' }, { id: 'kid', name: 'Kid' }];
+    const shared = { ...trip, personFlights: undefined };
+    const r = withHomeTimes(shared, 'me', home, people);
+    expect(r.trip.flight?.travelMinutes).toBe(60);
+    expect(r.trip.personFlights?.me.flight?.travelMinutes).toBe(45);
+    expect(r.trip.personFlights?.me.returnFlight?.onwardMinutes).toBe(45);
+    // Alone on the trip's flights: those change, and stay linked to the trip.
+    const alone = withHomeTimes(trip, 'me', home, [{ id: 'me', name: 'Me' }, { id: 'dad', name: 'Dad' }]);
+    expect(alone.trip.flight?.travelMinutes).toBe(45);
+    expect(alone.trip.personFlights?.me).toBeUndefined();
+  });
 });
