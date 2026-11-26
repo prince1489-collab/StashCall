@@ -133,3 +133,20 @@ describe('clock changes', () => {
     expect(t.toISOString()).toBe('2026-03-29T02:00:00.000Z');
   });
 });
+
+describe('landing before a connection', () => {
+  it('shows when the first flight lands and how long there is to change', () => {
+    const steps = buildTimeline({
+      flight: {
+        ...defaultFlight('2026-12-06T07:00', 'Asia/Kolkata', false),
+        airport: 'BOM',
+        arrives: '2026-12-06T09:10',
+        connections: [{ departure: '2026-12-06T12:00', timeZone: 'Asia/Kolkata', airport: 'DEL', destination: 'PGH', flightNumber: '6E7415', terminal: 'T1' }],
+      },
+    });
+    const land = steps.find((s) => s.kind === 'midLand')!;
+    expect(land.title).toBe('Land in Delhi');
+    expect(land.localTime).toBe('09:10');
+    expect(land.detail).toBe('2 h 50 min to change · 6E7415 · from T1');
+  });
+});

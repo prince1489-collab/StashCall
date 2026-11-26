@@ -52,14 +52,30 @@ export function connectionDetail(c: Connection): string {
 }
 
 function connectionSteps(f: FlightLeg): TimelineStep[] {
-  return (f.connections ?? []).map((c) => {
+  const flights = f.connections ?? [];
+  return flights.flatMap((c, i) => {
     const at = zonedToInstant(c.departure, c.timeZone);
-    return step('connection', 'Next flight departs', at, c.timeZone, {
-      estimate: false,
-      notify: true,
-      remindAt: addMinutes(at, -CONNECTION_REMIND_MINUTES),
-      detail: connectionDetail(c) || undefined,
-    });
+    // Landing before this connection: "Land in Delhi, 2 h 50 min to change".
+    const before = i === 0 ? f.arrives : flights[i - 1].arrives;
+    const landed = before ? zonedToInstant(before, c.timeZone) : undefined;
+    const city = c.airport ? (AIRPORTS[c.airport]?.city ?? c.airport) : undefined;
+    const gap = landed ? Math.round((at.getTime() - landed.getTime()) / 60000) : 0;
+    return [
+      ...(landed && gap > 0
+        ? [
+            step('midLand', city ? `Land in ${city}` : 'Land', landed, c.timeZone, {
+              estimate: false,
+              detail: [`${duration(gap)} to change`, c.flightNumber, c.terminal && `from ${c.terminal}`].filter(Boolean).join(' · '),
+            }),
+          ]
+        : []),
+      step('connection', 'Next flight departs', at, c.timeZone, {
+        estimate: false,
+        notify: true,
+        remindAt: addMinutes(at, -CONNECTION_REMIND_MINUTES),
+        detail: connectionDetail(c) || undefined,
+      }),
+    ];
   });
 }
 

@@ -20,19 +20,33 @@ describe('landing times from saved tickets', () => {
   it("fills in each journey's landing from its last flight", () => {
     const t = fillLandings(trip, [
       { flightNumber: 'QP1111', departure: '2026-12-06T07:00', arrival: '2026-12-06T09:10', connections: [{ flightNumber: '6E 7415', departure: '2026-12-06T12:00', arrival: '2026-12-06T13:10' }] },
-      { flightNumber: '6E7414', departure: '2026-12-08T13:20', connections: [{ flightNumber: '6E328', departure: '2026-12-08T17:45', arrival: '2026-12-08T20:05' }] },
+      { flightNumber: '6E7414', departure: '2026-12-08T13:20', arrival: '2026-12-08T15:05', connections: [{ flightNumber: '6E328', departure: '2026-12-08T17:45', arrival: '2026-12-08T20:05' }] },
       { flightNumber: '6E6228', departure: '2026-12-08T18:00', arrival: '2026-12-08T19:30' },
     ])!;
     expect(t.flight?.lands).toBe('2026-12-06T13:10');
+    // The first flight's landing, with a connection to catch.
+    expect(t.flight?.arrives).toBe('2026-12-06T09:10');
     expect(t.returnFlight?.lands).toBe('2026-12-08T20:05');
+    expect(t.returnFlight?.arrives).toBe('2026-12-08T15:05');
     expect(t.personFlights?.b.returnFlight?.lands).toBe('2026-12-08T19:30');
     // Typed in already: kept.
     expect(t.personFlights?.b.flight?.lands).toBe('2026-12-06T13:10');
-    expect(needsLandings(t)).toBe(false);
+    // Bajrang shares 6E7414, so his first landing fills in too.
+    expect(t.personFlights?.b.returnFlight?.arrives).toBe('2026-12-08T15:05');
+    expect(needsLandings(t, new Date('2026-12-01T00:00:00Z'))).toBe(false);
   });
 
   it('leaves the trip alone when no ticket says when the last flight lands', () => {
     expect(fillLandings(trip, [{ flightNumber: '6E328', departure: '2026-12-09T17:45', arrival: '2026-12-09T20:05' }])).toBeUndefined();
     expect(needsLandings(trip)).toBe(true);
+  });
+});
+
+describe('which trips still need landing times', () => {
+  it('counts a journey in the air, and stops a day after its last flight left', () => {
+    const oneWay: Trip = { ...trip, returnFlight: undefined, personFlights: undefined };
+    // 6E7415 left Delhi at 12:00 IST (06:30 UTC); not landed yet.
+    expect(needsLandings(oneWay, new Date('2026-12-06T07:00:00Z'))).toBe(true);
+    expect(needsLandings(oneWay, new Date('2026-12-07T07:00:00Z'))).toBe(false);
   });
 });

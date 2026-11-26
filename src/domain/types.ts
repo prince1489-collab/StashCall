@@ -89,6 +89,8 @@ export interface FlightLeg {
   connections?: Connection[];
   /** When the journey's last flight lands, in the destination's time zone. */
   lands?: LocalDateTime;
+  /** With connections: when this first flight lands at the connecting airport, in its time. */
+  arrives?: LocalDateTime;
   /** Airport to the hotel (on the way there) or home (on the way back). */
   onwardMinutes?: number;
 }
@@ -103,6 +105,8 @@ export interface Connection {
   airport?: string;
   destination?: string;
   terminal?: string;
+  /** When this flight lands, in its arrival airport's time. */
+  arrives?: LocalDateTime;
 }
 
 export interface HotelCheckout {
@@ -142,6 +146,11 @@ export interface Trip {
   itemIds: string[];
   /** Screenshots of tickets, boarding passes or bookings, kept on the phone. */
   tickets?: Ticket[];
+  /**
+   * Tickets already read for landing times, by id: each is read once, so a
+   * landing time the user removed stays removed.
+   */
+  landsRead?: string[];
   /** This phone's own boarding passes: kept on the phone for the gate, never shared. */
   passes?: Ticket[];
   /** Things sorted before travel day, such as insurance and visas. */
@@ -209,6 +218,7 @@ export type StepKind =
   | 'checkin'
   | 'bookRide'
   | 'land'
+  | 'midLand'
   | 'arrive';
 
 export interface TimelineStep {
