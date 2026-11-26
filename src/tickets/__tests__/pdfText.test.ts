@@ -26,6 +26,23 @@ describe('PDF tickets', () => {
     expect(d.departure).toBe('2026-12-06T07:00');
   });
 
+  it('finds the end of a stream whose length is a reference, and reads wrapped hex', () => {
+    const content = 'BT /F1 10 Tf 40 700 Td (QP 1111 06 Dec 2026 07:00) Tj ET';
+    const hex = [...content].map((c) => c.charCodeAt(0).toString(16).padStart(2, '0')).join('');
+    const wrapped = hex.replace(/(.{40})/g, '$1\n');
+    const pdf = (stream: string, length: string, filter = '') =>
+      new Uint8Array(
+        [
+          ...`%PDF-1.4\n1 0 obj << /Type /Page /Resources << /Font << /F1 2 0 R >> >> /Contents 3 0 R >> endobj\n`,
+          ...`2 0 obj << /Type /Font /Subtype /Type1 /BaseFont /Helvetica >> endobj\n`,
+          ...`3 0 obj << /Length ${length}${filter} >>\nstream\n${stream}\nendstream\nendobj\n`,
+          ...`4 0 obj ${stream.length} endobj\n%%EOF`,
+        ].map((c) => c.charCodeAt(0)),
+      );
+    expect(pdfText(pdf(content, '4 0 R'))).toEqual(['QP 1111 06 Dec 2026 07:00']);
+    expect(pdfText(pdf(`${wrapped}>`, String(wrapped.length + 1), ' /Filter /ASCIIHexDecode'))).toEqual(['QP 1111 06 Dec 2026 07:00']);
+  });
+
   it('finds nothing in something that is not a PDF', () => {
     expect(pdfText(new Uint8Array([1, 2, 3]))).toEqual([]);
   });

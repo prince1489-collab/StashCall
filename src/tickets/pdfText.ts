@@ -79,7 +79,7 @@ function ascii85(b: Uint8Array): Uint8Array {
 }
 
 function asciiHex(b: Uint8Array): Uint8Array {
-  const hex = latin1(b).replace(/[\s>].*$|\s/gs, '');
+  const hex = latin1(b).split('>')[0].replace(/\s/g, '');
   const padded = hex.length % 2 ? `${hex}0` : hex;
   const out = new Uint8Array(padded.length / 2);
   for (let i = 0; i < out.length; i++) out[i] = parseInt(padded.slice(i * 2, i * 2 + 2), 16);
@@ -103,7 +103,9 @@ function parseObjects(bytes: Uint8Array): Doc {
       let dataStart = start + s + 'stream'.length;
       if (text[dataStart] === '\r') dataStart++;
       if (text[dataStart] === '\n') dataStart++;
-      const len = Number(/\/Length\s+(\d+)(?!\s+\d+\s+R)/.exec(dict)?.[1]);
+      // "/Length 12 0 R" points elsewhere: find the end by "endstream" instead.
+      const lm = /\/Length\s+(\d+)(\s+\d+\s+R)?/.exec(dict);
+      const len = lm && !lm[2] ? Number(lm[1]) : NaN;
       const dataEnd = Number.isFinite(len) && len > 0 ? dataStart + len : text.lastIndexOf('endstream', end);
       doc.set(num, {
         dict,

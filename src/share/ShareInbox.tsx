@@ -118,7 +118,12 @@ export function ShareInbox() {
       }
 
       if (kept.length === 0) {
-        // Only PDFs, and they match this trip as it is.
+        // Only PDFs. Nothing read from them: say why, rather than claim a match.
+        if (all.length === 0) {
+          Alert.alert('No flight or hotel found', problem ?? "StashCall couldn't find a flight or hotel in that PDF. Share a screenshot of it instead.");
+          return;
+        }
+        // They match this trip as it is.
         Alert.alert('Already in your trip', `That booking matches ${currentTrip.name}, so nothing needed changing.`);
         return;
       }
