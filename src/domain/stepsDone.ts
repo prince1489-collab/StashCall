@@ -6,16 +6,25 @@ import type { Person, StepDone, TimelineStep, Trip } from './types';
  * Ticking timeline steps off: "Web check-in" done, "Book a ride" done.
  *
  * A tick belongs to one person's step, saved on the trip so every phone in
- * the household sees it. The key names the step by kind, day and its place
- * among that day's steps of the same kind, so nudging a time (a later
- * wake-up, a longer drive) keeps the tick; moving the flight to another day
- * clears it, as it should.
+ * the household sees it. The key names the step by kind and day, plus the
+ * flight it's about when it has one (a check-in, a connection), else its
+ * place among that day's steps of the same kind. So nudging a time (a
+ * later wake-up, a longer drive) keeps the tick, two check-ins on one day
+ * keep their own ticks whatever order they open in, and moving the flight
+ * to another day clears it, as it should.
  */
 export function stepKey(s: TimelineStep, steps: TimelineStep[]): string {
   const day = instantToZoned(s.at, s.timeZone).slice(0, 10);
+  const flight = stepFlight(s);
+  if (flight) return `${s.kind}@${day}#${flight}`;
   const same = steps.filter((x) => x.kind === s.kind && instantToZoned(x.at, x.timeZone).slice(0, 10) === day);
   const n = Math.max(0, same.indexOf(s));
   return `${s.kind}@${day}#${n}`;
+}
+
+/** The flight a step is about, from its detail: "QP1111 · Akasa Air" → QP1111. */
+export function stepFlight(s: Pick<TimelineStep, 'detail'>): string | undefined {
+  return s.detail?.match(/\b(?=[A-Z0-9]*[A-Z])[A-Z0-9]{2}\d{1,4}\b/)?.[0];
 }
 
 const doneKey = (personId: string, key: string) => `${personId}|${key}`;
