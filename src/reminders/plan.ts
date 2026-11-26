@@ -1,7 +1,7 @@
 import { buildTimeline } from '../domain/timeline';
 import { reminderItems } from '../domain/tripItems';
 import { checkIns } from '../domain/checkin';
-import { stepDone } from '../domain/stepsDone';
+import { stepDone, stepFlight } from '../domain/stepsDone';
 import { prepTasks, shortDate } from '../domain/prep';
 import type { PrepPrefs, PrepTask } from '../domain/prep';
 import type { Item, Person, PrepKind, StepKind, TimelineStep, Trip } from '../domain/types';
@@ -26,9 +26,10 @@ export interface PlannedReminder {
 export function planCheckInReminders(trip: Trip, now: Date, meId?: string): PlannedReminder[] {
   // Checked in already, and ticked it off: no nudge.
   const steps = buildTimeline(trip);
-  const done = steps.filter((s) => s.kind === 'checkin' && stepDone(trip, meId, s, steps)).map((s) => s.at.getTime());
+  // Matched by flight, not time: two airlines' check-ins can open at once.
+  const done = steps.filter((s) => s.kind === 'checkin' && stepDone(trip, meId, s, steps)).map(stepFlight);
   return checkIns(trip)
-    .filter((c) => c.at.getTime() > now.getTime() && !done.includes(c.at.getTime()))
+    .filter((c) => c.at.getTime() > now.getTime() && !done.includes(c.flightNumbers[0]))
     .map((c) => ({
       id: `${trip.id}:checkin:${c.flightNumbers[0]}`,
       at: c.at,
