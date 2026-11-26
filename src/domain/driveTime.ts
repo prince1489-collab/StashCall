@@ -1,7 +1,8 @@
 import { airportPoint } from './airportPins';
 import { AIRPORTS } from './airports';
 import type { Place } from './places';
-import type { FlightLeg, Trip } from './types';
+import { travellers } from './people';
+import type { FlightLeg, Person, Trip } from './types';
 
 /**
  * Rough drive times from the map, with no traffic service: the straight-line
@@ -68,37 +69,46 @@ export function withStayTimes(trip: Trip, stay: Place): { trip: Trip; changes: D
 
 /**
  * The trip with this phone's person's drive times from home: to the airport
- * on the way out, and from the airport on the way back. Their own flights
- * when they have them, else the trip's.
+ * on the way out, and from the airport on the way back. On their own flights
+ * when they have them; on the trip's when nobody else going uses those, so
+ * the trip's flights keep reaching them; otherwise as their own copy, so
+ * someone else's day doesn't move to fit this home.
  */
-export function withHomeTimes(trip: Trip, meId: string | undefined, home: Place): { trip: Trip; changes: DriveChange[] } {
+export function withHomeTimes(trip: Trip, meId: string | undefined, home: Place, people: Person[] = []): { trip: Trip; changes: DriveChange[] } {
   const changes: DriveChange[] = [];
-  const own = meId ? trip.personFlights?.[meId] : undefined;
-  const out = (f: Leg): Leg => {
-    const p = f && airportPoint(f.airport, f.terminal);
-    if (!f || !p) return f;
+  const note = (code: string, minutes: number) => {
+    if (!changes.some((c) => c.airport === code)) changes.push({ airport: code, minutes });
+  };
+  const out = (f: FlightLeg): FlightLeg | undefined => {
+    const p = airportPoint(f.airport, f.terminal);
+    if (!p) return undefined;
     const minutes = driveMinutes(home, p);
-    changes.push({ airport: f.airport!, minutes });
+    note(f.airport!, minutes);
     return { ...f, travelMinutes: minutes };
   };
-  const inbound = (f: Leg): Leg => {
-    const p = f && airportPoint(f.destination);
-    if (!f || !p) return f;
+  const inbound = (f: FlightLeg): FlightLeg | undefined => {
+    const p = airportPoint(f.destination);
+    if (!p) return undefined;
     const minutes = driveMinutes(p, home);
-    if (!changes.some((c) => c.airport === f.destination)) changes.push({ airport: f.destination!, minutes });
+    note(f.destination!, minutes);
     return { ...f, onwardMinutes: minutes };
   };
+  const others = travellers(trip, people).filter((p) => p.id !== meId);
   let next = trip;
-  if (own?.flight !== undefined) {
-    if (own.flight) next = { ...next, personFlights: { ...next.personFlights, [meId!]: { ...own, flight: out(own.flight) } } };
-  } else {
-    next = { ...next, flight: out(trip.flight) ?? undefined };
-  }
-  const ownNow = meId ? next.personFlights?.[meId] : undefined;
-  if (ownNow?.returnFlight !== undefined) {
-    if (ownNow.returnFlight) next = { ...next, personFlights: { ...next.personFlights, [meId!]: { ...ownNow, returnFlight: inbound(ownNow.returnFlight) } } };
-  } else {
-    next = { ...next, returnFlight: inbound(trip.returnFlight) ?? undefined };
+  for (const [key, set] of [['flight', out], ['returnFlight', inbound]] as const) {
+    const own = meId ? next.personFlights?.[meId] : undefined;
+    const mine = own?.[key];
+    if (mine === null) continue;
+    const leg = mine ?? next[key];
+    if (!leg) continue;
+    const changed = set(leg);
+    if (!changed) continue;
+    const othersShare = others.some((p) => next.personFlights?.[p.id]?.[key] === undefined);
+    if (mine || (meId && othersShare)) {
+      next = { ...next, personFlights: { ...next.personFlights, [meId!]: { ...own, [key]: changed } } };
+    } else {
+      next = { ...next, [key]: changed };
+    }
   }
   return { trip: next, changes };
 }

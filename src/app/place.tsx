@@ -4,7 +4,7 @@ import { Alert, Linking, ScrollView, StyleSheet, Text, TextInput } from 'react-n
 
 import { describeChanges, withHomeTimes, withStayTimes } from '../domain/driveTime';
 import type { DriveChange } from '../domain/driveTime';
-import { isGoing } from '../domain/people';
+import { isGoing, tripFor } from '../domain/people';
 import { upcomingTrips } from '../domain/trips';
 import type { Trip } from '../domain/types';
 import { isShortMapsLink, mapsLink, parsePin, pinLabel } from '../domain/places';
@@ -55,10 +55,15 @@ export default function PlaceScreen() {
     }
   };
 
-  const save = async (place: Place | undefined, timed?: Map<string, Trip>) => {
+  /** Drive times from this pin, for one trip as it is now. */
+  const timesFor = (t: Trip, place: Place) => (stay ? withStayTimes(t, place) : withHomeTimes(t, data.meId, place, data.owners));
+
+  const save = async (place: Place | undefined, timedIds?: Set<string>) => {
     await update((d) => {
+      // Worked out again on each trip as it is now, so changes synced from
+      // another phone while the question was open aren't undone.
       const trips = d.trips.map((t) => {
-        const base = timed?.get(t.id) ?? t;
+        const base = place && timedIds?.has(t.id) ? timesFor(t, place).trip : t;
         return stay && t.id === tripId ? { ...base, stay: place } : base;
       });
       return stay ? { ...d, trips } : { ...d, trips, home: place };
@@ -72,13 +77,17 @@ export default function PlaceScreen() {
    * person's coming trips.
    */
   const saveWithTimes = (place: Place) => {
-    const timed = new Map<string, Trip>();
+    const timedIds = new Set<string>();
     const changes: DriveChange[] = [];
-    const targets = stay ? [trip!] : upcomingTrips(data.trips, new Date()).filter((t) => isGoing(t, data.meId));
+    const now = new Date();
+    // Coming trips by this person's own flights, which can end later than the trip's.
+    const targets = stay
+      ? [trip!]
+      : data.trips.filter((t) => isGoing(t, data.meId) && upcomingTrips([tripFor(t, data.meId)], now).length > 0);
     for (const t of targets) {
-      const r = stay ? withStayTimes(t, place) : withHomeTimes(t, data.meId, place);
+      const r = timesFor(t, place);
       if (r.changes.length === 0) continue;
-      timed.set(t.id, r.trip);
+      timedIds.add(t.id);
       for (const c of r.changes) if (!changes.some((x) => x.airport === c.airport)) changes.push(c);
     }
     if (changes.length === 0) return save(place);
@@ -87,7 +96,7 @@ export default function PlaceScreen() {
       `${describeChanges(changes, formatMinutes)}\n\nWorked out from the map, without traffic. Your plan moves to match, and you can still change them under Edit trip.`,
       [
         { text: 'Keep my times', style: 'cancel', onPress: () => save(place) },
-        { text: 'Use them', onPress: () => save(place, timed) },
+        { text: 'Use them', onPress: () => save(place, timedIds) },
       ],
     );
   };
