@@ -25,7 +25,8 @@ export function parsePin(text: string): { lat: number; lng: number } | undefined
   }
   // A place's own pin beats the map's centre in a link that has both.
   const exact = t.match(/!3d(-?\d+(?:\.\d+)?)!4d(-?\d+(?:\.\d+)?)/);
-  const m = exact ?? t.match(/(-?\d{1,2}(?:\.\d+)?)\s*,\s*(-?\d{1,3}(?:\.\d+)?)/);
+  // Whole numbers only: "129.03" must not be read as 29.03.
+  const m = exact ?? t.match(/(?:^|[^\d.-])(-?\d+(?:\.\d+)?)\s*,\s*(-?\d+(?:\.\d+)?)(?![\d.])/);
   if (!m) return undefined;
   const lat = Number(m[1]);
   const lng = Number(m[2]);

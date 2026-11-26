@@ -23,6 +23,10 @@ describe('parsePin', () => {
     expect(parsePin('Sun 6, 2026')).toBeUndefined();
     expect(parsePin('95.1, 72.8')).toBeUndefined();
     expect(parsePin('100%')).toBeUndefined();
+    expect(parsePin('129.033755, 79.468833')).toBeUndefined();
+    expect(parsePin('-129.033755, 79.468833')).toBeUndefined();
+    expect(parsePin('29.03, 1179.46')).toBeUndefined();
+    expect(parsePin('-33.86, 151.21')).toEqual({ lat: -33.86, lng: 151.21 });
   });
 
   it('knows a share link has to be opened first', () => {
