@@ -274,24 +274,44 @@ function dropBookedOn(text: string): string {
   return text.replace(
     /\b(?:booked\s+on|booking\s+date|date\s+of\s+(?:booking|issue)|issued?\s+on|issue\s+date|ticketed\s+on)\b[^\n]*/gi,
     (m) => {
-      // Blank out the label and the date and time right after it, nothing further.
-      const window = m.slice(0, 60);
-      const ends = [...findDates(window), ...findTimes(window)].map((f) => f.end);
-      const end = ends.length ? Math.max(...ends) : m.search(/:|$/) + 1;
-      return ' '.repeat(end) + m.slice(end).replace(/^\s*hrs\b/i, '');
+      // Blank out the label, its date and a time right after that date:
+      // nothing further, as a departure can follow on the same line.
+      const date = findDates(m).find((d) => d.index < 25);
+      if (!date) return m;
+      const time = /^\s*,?\s*(?:at\s+)?\d{1,2}[:.]\d{2}(?:\s*(?:hrs|[ap]\.?m\.?))?\b/i.exec(m.slice(date.end));
+      const end = date.end + (time ? time[0].length : 0);
+      return ' '.repeat(end) + m.slice(end);
     },
   );
 }
 
 /**
- * The small print after the itinerary ("Points to remember", "Terms and
+ * The small print after an itinerary ("Points to remember", "Terms and
  * conditions") mentions other places and dates: "travel to and from Dubai".
- * Cut it, once a flight number has come before it.
+ * Cut each such section, up to the next flight with a date (a later page's
+ * itinerary), once a flight number has come before it.
  */
 function dropFinePrint(text: string): string {
-  const m = /\n[^\n]*\b(?:points\s+to\s+remember|terms\s+(?:and|&)\s+conditions|important\s+(?:information|notes?|instructions)|fare\s+rules)\b/i.exec(text);
-  if (!m || !findFlightNumber(text.slice(0, m.index))) return text;
-  return text.slice(0, m.index);
+  const heading = /\n[^\n]*\b(?:points\s+to\s+remember|terms\s+(?:and|&)\s+conditions|important\s+(?:information|notes?|instructions)|fare\s+rules)\b/gi;
+  let out = '';
+  let from = 0;
+  for (const m of text.matchAll(heading)) {
+    if (m.index < from || !findFlightNumber(text.slice(0, m.index))) continue;
+    out += text.slice(from, m.index) + '\n';
+    from = nextItinerary(text, m.index + m[0].length) ?? text.length;
+  }
+  return out + text.slice(from);
+}
+
+/** Where the next flight number with a date close by starts its line. */
+function nextItinerary(text: string, after: number): number | undefined {
+  for (const m of text.slice(after).matchAll(/\b([A-Z]{2}|[A-Z]\d|\d[A-Z])(?:\s?-\s?|\s?)(\d{1,4})\b/g)) {
+    if (/^(AM|PM|NO|TO|OF|ON|AT|IN|BY)$/.test(m[1]) || (/\d/.test(m[1]) && !DIGIT_AIRLINES.has(m[1]))) continue;
+    const at = after + m.index;
+    const start = text.lastIndexOf('\n', at) + 1;
+    if (findDates(text.slice(start, at + 120)).length > 0) return start;
+  }
+  return undefined;
 }
 
 function findCheckout(text: string, today: Date): LocalDateTime | undefined {
