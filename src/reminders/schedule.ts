@@ -7,6 +7,8 @@ import type { PlannedReminder } from './plan';
 // alarm-style reminders need a new channel id.
 const CHANNEL = 'travel-alarms';
 const OLD_CHANNEL = 'travel-reminders';
+/** Family updates ("Bajrang has landed"): a normal notification, not an alarm. */
+const FAMILY_CHANNEL = 'family-updates';
 /** Bundled via the expo-notifications plugin in app.json (assets/sounds). */
 const ALARM_SOUND = 'stashcall_alarm.wav';
 
@@ -40,6 +42,11 @@ export function configureNotifications(): void {
   Notifications.setNotificationCategoryAsync(CATEGORY_ITEMS, [DONE_BUTTON, SNOOZE_BUTTON]).catch(() => {});
   Notifications.setNotificationCategoryAsync(CATEGORY_PLAIN, [SNOOZE_BUTTON]).catch(() => {});
   if (Platform.OS === 'android') {
+    Notifications.setNotificationChannelAsync(FAMILY_CHANNEL, {
+      name: 'Family updates',
+      description: 'When someone on your trip leaves, gets to the airport or lands',
+      importance: Notifications.AndroidImportance.HIGH,
+    }).catch(() => {});
     Notifications.setNotificationChannelAsync(CHANNEL, {
       name: 'Travel alarms',
       description: 'Packing, wake-up, leave-home and room-sweep reminders',
@@ -141,7 +148,7 @@ export async function syncReminders(plan: PlannedReminder[], tripIds: string[]):
         priority: Notifications.AndroidNotificationPriority.MAX,
         // Stays until "Done", "In 15 min" or a tap, like an alarm.
         sticky: true,
-        data: { kind: r.kind, tripId: r.tripId },
+        data: { kind: r.kind, tripId: r.tripId, ...(r.url && { url: r.url }) },
         categoryIdentifier: r.hasItems ? CATEGORY_ITEMS : CATEGORY_PLAIN,
       },
       trigger: {
@@ -195,4 +202,13 @@ export async function sendTestReminder(body: string): Promise<boolean> {
     },
   });
   return true;
+}
+
+/** Tells this phone about a family update now: "Bajrang has landed". */
+export async function notifyFamily(text: string): Promise<void> {
+  if ((await getPermission()) !== 'granted') return;
+  await Notifications.scheduleNotificationAsync({
+    content: { title: text, body: 'Open StashCall to see where everyone is.' },
+    trigger: Platform.OS === 'android' ? { channelId: FAMILY_CHANNEL } : null,
+  }).catch(() => {});
 }

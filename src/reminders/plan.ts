@@ -1,5 +1,6 @@
 import { buildTimeline } from '../domain/timeline';
 import { reminderItems } from '../domain/tripItems';
+import { checkIns } from '../domain/checkin';
 import { prepTasks, shortDate } from '../domain/prep';
 import type { PrepPrefs, PrepTask } from '../domain/prep';
 import type { Item, Person, PrepKind, StepKind, TimelineStep, Trip } from '../domain/types';
@@ -10,12 +11,33 @@ export interface PlannedReminder {
   at: Date;
   title: string;
   body: string;
-  kind: StepKind | PrepKind;
+  kind: StepKind | PrepKind | 'checkin';
   /** Time-critical reminders use the strongest delivery Android allows. */
   critical: boolean;
   tripId: string;
   /** Whether the reminder lists items, so it gets a "Done" button. */
   hasItems: boolean;
+  /** A page a tap opens, like the airline's check-in. */
+  url?: string;
+}
+
+/** "Check in for QP1111" when online check-in opens, a tap away from the airline. */
+export function planCheckInReminders(trip: Trip, now: Date): PlannedReminder[] {
+  return checkIns(trip)
+    .filter((c) => c.at.getTime() > now.getTime())
+    .map((c) => ({
+      id: `${trip.id}:checkin:${c.flightNumbers[0]}`,
+      at: c.at,
+      title: `Check in for ${listItems(c.flightNumbers)}`,
+      body: `${c.airline} online check-in should be open now${c.home ? ' for your flight home' : ''}. ${
+        c.url ? 'Tap to open their website.' : 'Use their app or website.'
+      }`,
+      kind: 'checkin' as const,
+      critical: false,
+      tripId: trip.id,
+      hasItems: false,
+      ...(c.url && { url: c.url }),
+    }));
 }
 
 /** Joins item names for a notification: "Passports, Glasses and Phone charger". */

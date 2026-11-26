@@ -1,5 +1,6 @@
 import * as Notifications from 'expo-notifications';
 import { useEffect, useRef } from 'react';
+import { Linking } from 'react-native';
 
 import { tickAll } from '../domain/checklist';
 import { setPrep } from '../domain/prep';
@@ -33,6 +34,15 @@ export function NotificationActions() {
         // A plain tap opens the app; reminders are sticky, so clear it too.
         if (actionIdentifier === Notifications.DEFAULT_ACTION_IDENTIFIER) {
           await Notifications.dismissNotificationAsync(request.identifier).catch(() => {});
+          // A check-in reminder opens the airline's website.
+          const url = (request.content.data as { url?: unknown } | undefined)?.url;
+          if (typeof url === 'string' && url.startsWith('https://')) {
+            const key = `${request.identifier}:open:${notification.date}`;
+            if (!handled.current.has(key)) {
+              handled.current.add(key);
+              await Linking.openURL(url).catch(() => {});
+            }
+          }
         }
         return;
       }
