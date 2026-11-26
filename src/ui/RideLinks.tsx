@@ -5,7 +5,7 @@ import { driverMessage, rideFrom, rideTo, uberUrl, whatsappUrl } from '../domain
 import type { Ride } from '../domain/rides';
 import { addMinutes, timeLabel, zonedToInstant } from '../domain/time';
 import { EXIT_MINUTES } from '../domain/timeline';
-import type { FlightLeg, TimelineStep, Trip } from '../domain/types';
+import type { FlightLeg, TimelineStep } from '../domain/types';
 import { useAppData } from '../state/AppData';
 import { colors, space } from './theme';
 
@@ -66,34 +66,4 @@ export function JourneyRides({ f, leave, home }: { f: FlightLeg; leave?: Timelin
   );
 }
 
-/**
- * Taps on the timeline: "Check in" on check-in opening, "Message a driver"
- * on booking the ride and on landing.
- */
-export function stepAction(
-  s: TimelineStep,
-  steps: TimelineStep[],
-  plan: Pick<Trip, 'flight' | 'returnFlight'>,
-  templates: { toAirport?: string; fromAirport?: string } | undefined,
-): { label: string; url: string } | undefined {
-  const day = (d: Date, tz: string) => d.toLocaleDateString(undefined, { weekday: 'short', day: 'numeric', month: 'short', timeZone: tz });
-  if (s.kind === 'checkin') return s.link ? { label: 'Check in', url: s.link } : undefined;
-  if (s.kind === 'bookRide') {
-    const leave = steps.find((x) => (x.kind === 'leave' || x.kind === 'returnLeave') && x.at.getTime() >= s.at.getTime());
-    const home = leave?.kind === 'returnLeave';
-    const f = home ? plan.returnFlight : plan.flight;
-    if (!f || !leave) return undefined;
-    const ride = rideTo(f, { day: day(leave.at, leave.timeZone), time: leave.localTime }, home ? 'hotel' : 'home');
-    return { label: 'Message a driver', url: whatsappUrl(driverMessage(ride, templates?.toAirport)) };
-  }
-  if (s.kind === 'land') {
-    const takeoffs = steps.filter((x) => (x.kind === 'takeoff' || x.kind === 'returnTakeoff') && x.at.getTime() < s.at.getTime());
-    const home = takeoffs[takeoffs.length - 1]?.kind === 'returnTakeoff';
-    const f = home ? plan.returnFlight : plan.flight;
-    if (!f) return undefined;
-    const pickup = addMinutes(s.at, EXIT_MINUTES);
-    const ride = rideFrom(f, { day: day(pickup, s.timeZone), time: timeLabel(pickup, s.timeZone) }, home ? 'home' : 'hotel');
-    return ride ? { label: 'Message a driver', url: whatsappUrl(driverMessage(ride, templates?.fromAirport, true)) } : undefined;
-  }
-  return undefined;
-}
+export { stepAction } from '../domain/rides';

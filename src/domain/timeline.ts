@@ -138,6 +138,7 @@ export function returnFlightSteps(f: FlightLeg): TimelineStep[] {
     ...map[s.kind],
     ...(s.kind === 'land' && s.detail && { detail: s.detail.replace('the hotel', 'home') }),
     itemMoment: s.itemMoment ? 'checkout' : undefined,
+    home: true,
   }));
 }
 

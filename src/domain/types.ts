@@ -219,4 +219,6 @@ export interface TimelineStep {
   detail?: string;
   /** A web page for the step, like the airline's check-in. */
   link?: string;
+  /** True for steps of the journey home. */
+  home?: boolean;
 }
