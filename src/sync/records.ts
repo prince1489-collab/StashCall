@@ -39,8 +39,8 @@ interface Prefs {
  * themselves travel separately (sync/tickets.ts), and each phone keeps its
  * own copy. Insurance and visa photos stay on this phone.
  */
-function shareableTrip(t: Trip): Omit<Trip, 'tickets' | 'docs'> & { tickets: { id: string; addedAt: string }[] } {
-  const { tickets, docs: _d, ...rest } = t;
+function shareableTrip(t: Trip): Omit<Trip, 'tickets' | 'docs' | 'passes'> & { tickets: { id: string; addedAt: string }[] } {
+  const { tickets, docs: _d, passes: _p, ...rest } = t;
   return { ...rest, tickets: (tickets ?? []).map(({ id, addedAt }) => ({ id, addedAt })) };
 }
 function shareableItem(i: Item): Omit<Item, 'photoUri'> {
@@ -163,8 +163,8 @@ function put(data: AppData, kind: RecordKind, id: string, value: unknown): AppDa
       const tickets = remote.tickets
         ? remote.tickets.map((r) => old?.tickets?.find((x) => x.id === r.id) ?? { id: r.id, addedAt: r.addedAt, uri: '' })
         : (old?.tickets ?? []);
-      // Document photos never leave this phone.
-      const trip: Trip = { ...remote, tickets: tickets.length > 0 ? tickets : undefined, docs: old?.docs };
+      // Document photos and boarding passes never leave this phone.
+      const trip: Trip = { ...remote, tickets: tickets.length > 0 ? tickets : undefined, docs: old?.docs, passes: old?.passes };
       if (old) return { ...data, trips: data.trips.map((t) => (t.id === id ? trip : t)) };
       // A new trip goes first if it was made after the current one, like a trip made here.
       const first = data.trips[0];

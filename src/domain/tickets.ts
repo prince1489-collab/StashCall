@@ -18,3 +18,19 @@ export function removeTicket(data: AppData, tripId: string, ticketId: string): A
     ),
   };
 }
+
+/** Adds boarding passes to a trip, on this phone only. */
+export function addPasses(data: AppData, tripId: string, passes: Ticket[]): AppData {
+  return {
+    ...data,
+    trips: data.trips.map((t) => (t.id === tripId ? { ...t, passes: [...(t.passes ?? []), ...passes] } : t)),
+  };
+}
+
+/** Removes one boarding pass from a trip. */
+export function removePass(data: AppData, tripId: string, passId: string): AppData {
+  return {
+    ...data,
+    trips: data.trips.map((t) => (t.id === tripId ? { ...t, passes: (t.passes ?? []).filter((x) => x.id !== passId) } : t)),
+  };
+}

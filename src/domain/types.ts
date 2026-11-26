@@ -126,6 +126,8 @@ export interface Trip {
   itemIds: string[];
   /** Screenshots of tickets, boarding passes or bookings, kept on the phone. */
   tickets?: Ticket[];
+  /** This phone's own boarding passes: kept on the phone for the gate, never shared. */
+  passes?: Ticket[];
   /** Things sorted before travel day, such as insurance and visas. */
   prep?: Partial<Record<PrepKind, PrepStatus>>;
   /** Photos of this trip's insurance policy or visa. */
