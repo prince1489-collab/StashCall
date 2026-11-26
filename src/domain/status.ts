@@ -1,5 +1,6 @@
 import type { AppData } from '../storage/store';
 import type { Person, StatusStep, Trip } from './types';
+import { tripFor } from './people';
 import { tripSpan } from './trips';
 
 /**
@@ -37,12 +38,17 @@ export function statusOn(p: Person, tripId: string, now: Date) {
   return { ...STEP.get(s.step)!, at };
 }
 
-/** The card shows from the day before the trip until the day after it ends. */
-export function showStatus(trip: Trip, now: Date): boolean {
-  const span = tripSpan(trip);
-  if (!span) return false;
+/**
+ * The card shows from the day before anyone on the trip sets off until the
+ * day after the last of them is done, each traveller with their own flights.
+ */
+export function showStatus(trip: Trip, people: Person[], now: Date): boolean {
   const day = 24 * 3600 * 1000;
-  return now.getTime() >= span.start.getTime() - day && now.getTime() <= span.end.getTime() + day;
+  const plans = people.length > 0 ? people.map((p) => tripFor(trip, p.id)) : [trip];
+  return plans.some((t) => {
+    const span = tripSpan(t);
+    return !!span && now.getTime() >= span.start.getTime() - day && now.getTime() <= span.end.getTime() + day;
+  });
 }
 
 /**

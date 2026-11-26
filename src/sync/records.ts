@@ -113,6 +113,15 @@ export function applyRemote(data: AppData, state: SyncState, rows: SyncRow[]): {
       mine && known && state[key] !== fingerprint(mine.data) && !onlyNewTicketList(state[key], row.kind, mine.data);
     // Deleted here, and the deletion not sent yet.
     const deletedHere = !mine && known && state[key] !== DELETED;
+    // A person changed on both phones (a passport date there, a travel
+    // update here): merge field by field, so neither change is lost.
+    if (changedHere && row.kind === 'person' && !row.deleted && mine) {
+      next = put(next, 'person', row.id, mergePerson(state[key], mine.data as Person, row.data as Person));
+      // Still differs from the server, so the merged record is sent next.
+      nextState[key] = fingerprint(row.data);
+      changed = true;
+      continue;
+    }
     // Anything this phone made before it joined loses to the household's copy.
     if (changedHere || deletedHere) continue;
     next = row.deleted ? remove(next, row.kind, row.id) : put(next, row.kind, row.id, row.data);
@@ -188,4 +197,28 @@ function put(data: AppData, kind: RecordKind, id: string, value: unknown): AppDa
       return { ...data, insurance: prefs.insurance, insuranceEnds: prefs.insuranceEnds, passportExpires: prefs.passportExpires };
     }
   }
+}
+
+/**
+ * Three-way merge of a person: fields changed here since the version both
+ * phones agreed on keep this phone's value, the rest take the other phone's.
+ * Two travel updates: the later one wins.
+ */
+export function mergePerson(agreed: string | undefined, mine: Person, theirs: Person): Person {
+  let base: Record<string, unknown> = {};
+  try {
+    base = (agreed && agreed !== DELETED ? JSON.parse(agreed) : {}) ?? {};
+  } catch {
+    base = {};
+  }
+  const out: Record<string, unknown> = { ...theirs };
+  const m = mine as unknown as Record<string, unknown>;
+  for (const k of new Set([...Object.keys(m), ...Object.keys(base)])) {
+    if (fingerprint(m[k]) !== fingerprint(base[k])) {
+      if (m[k] === undefined) delete out[k];
+      else out[k] = m[k];
+    }
+  }
+  if (mine.status && theirs.status) out.status = Date.parse(mine.status.at) >= Date.parse(theirs.status.at) ? mine.status : theirs.status;
+  return out as unknown as Person;
 }
