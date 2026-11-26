@@ -74,8 +74,14 @@ export function driverMessage(ride: Ride, template: string | undefined, fromAirp
 export const whatsappUrl = (text: string) => `https://wa.me/?text=${encodeURIComponent(text)}`;
 
 /** Opens Uber from where the person is, with the drop-off named when we know it. */
-export function uberUrl(dropoff?: string): string {
-  const q = new URLSearchParams({ action: 'setPickup', pickup: 'my_location', ...(dropoff && { 'dropoff[nickname]': dropoff }) });
+export function uberUrl(dropoff?: string, pin?: { lat: number; lng: number }): string {
+  const q = new URLSearchParams({
+    action: 'setPickup',
+    pickup: 'my_location',
+    ...(dropoff && { 'dropoff[nickname]': dropoff }),
+    // Uber only fills in "Where to?" from a point on the map.
+    ...(pin && { 'dropoff[latitude]': String(pin.lat), 'dropoff[longitude]': String(pin.lng) }),
+  });
   return `https://m.uber.com/ul/?${q.toString()}`;
 }
 

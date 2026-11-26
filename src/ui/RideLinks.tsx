@@ -1,6 +1,7 @@
 import { Linking, Pressable, StyleSheet, Text, View } from 'react-native';
 
 import { AIRPORTS } from '../domain/airports';
+import { terminalPin } from '../domain/airportPins';
 import { driverMessage, rideFrom, rideTo, uberUrl, whatsappUrl } from '../domain/rides';
 import type { Ride } from '../domain/rides';
 import { addMinutes, timeLabel, zonedToInstant } from '../domain/time';
@@ -19,12 +20,14 @@ export function RideLinks({
   ride,
   fromAirport = false,
   dropoff,
+  pin,
   dark = false,
 }: {
   label: string;
   ride: Ride;
   fromAirport?: boolean;
   dropoff?: string;
+  pin?: { lat: number; lng: number };
   dark?: boolean;
 }) {
   const { data } = useAppData();
@@ -40,7 +43,7 @@ export function RideLinks({
       <Pressable style={[styles.button, dark && styles.buttonDark]} onPress={() => open(whatsappUrl(text))} accessibilityRole="link" accessibilityLabel={`${label}: message a driver on WhatsApp`}>
         <Text style={[styles.buttonText, dark && styles.onNavy]}>WhatsApp</Text>
       </Pressable>
-      <Pressable style={[styles.button, dark && styles.buttonDark]} onPress={() => open(uberUrl(dropoff))} accessibilityRole="link" accessibilityLabel={`${label}: open Uber`}>
+      <Pressable style={[styles.button, dark && styles.buttonDark]} onPress={() => open(uberUrl(dropoff, pin))} accessibilityRole="link" accessibilityLabel={`${label}: open Uber`}>
         <Text style={[styles.buttonText, dark && styles.onNavy]}>Uber</Text>
       </Pressable>
     </View>
@@ -89,7 +92,7 @@ export function JourneyRides({ f, leave, home, dark = false }: { f: FlightLeg; l
   }
   return (
     <View>
-      <RideLinks label="Ride to the airport" ride={to} dropoff={to.to} dark={dark} />
+      <RideLinks label="Ride to the airport" ride={to} dropoff={to.to} pin={terminalPin(f.airport, f.terminal)} dark={dark} />
       {from ? (
         <RideLinks label={home ? 'Ride home' : 'Ride to the hotel'} ride={from} fromAirport dark={dark} />
       ) : (
