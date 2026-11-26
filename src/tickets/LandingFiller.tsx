@@ -5,7 +5,7 @@ import type { TicketDetails } from '../domain/ticketParse';
 import { useAppData } from '../state/AppData';
 import { readTicket } from './readTicket';
 
-/** Tickets being read now, so a change to the data meanwhile doesn't read them twice. */
+/** Tickets tried since the app started: each is tried once per launch, read or not. */
 const read = new Set<string>();
 
 /**
@@ -33,10 +33,11 @@ export function LandingFiller() {
         for (const k of t.tickets) {
           const r = await readTicket(k.uri);
           readings.push(r.details);
-          // A ticket the reader couldn't open (still downloading, say) is tried again next time.
+          // A ticket the reader couldn't open (still downloading, say) stays
+          // unmarked on the trip, so it's tried again the next time the app starts.
           if (!r.error) done.push(k.id);
-          else read.delete(k.id);
         }
+        if (done.length === 0) continue;
         await update((d) => ({
           ...d,
           trips: d.trips.map((x) => {
