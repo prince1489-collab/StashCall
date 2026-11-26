@@ -46,6 +46,12 @@ export default function Settings() {
         </Nav>
       </Section>
 
+      <Section title="Home">
+        <Nav onPress={() => router.push({ pathname: '/place', params: { kind: 'home' } })}>
+          {data.home ? data.home.name || 'Home pin added' : 'Add your home’s pin, for Uber to and from the airport'}
+        </Nav>
+      </Section>
+
       <Section title="Driver message">
         <Nav onPress={() => router.push('/driver-message')}>
           {data.driverTemplates?.toAirport || data.driverTemplates?.fromAirport ? 'Your own message' : 'Write your own, in any language'}

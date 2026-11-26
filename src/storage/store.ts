@@ -1,5 +1,6 @@
 import AsyncStorage from '@react-native-async-storage/async-storage';
 
+import type { Place } from '../domain/places';
 import type { InsuranceCover, Item, LocalDate, Owner, Ticket, Trip } from '../domain/types';
 
 /**
@@ -23,6 +24,8 @@ export interface AppData {
   passportExpires?: LocalDate;
   /** This phone's own messages for a driver, in any language, with {time}-style blanks. Not shared. */
   driverTemplates?: { toAirport?: string; fromAirport?: string };
+  /** This phone's person's home, with its map pin, for rides to and from the airport. Not shared. */
+  home?: Place;
 }
 
 const KEY = 'stashcall:data';

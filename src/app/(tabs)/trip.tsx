@@ -161,6 +161,7 @@ function TripDetail({ trip }: { trip: Trip }) {
   const planId = person?.id ?? data.meId;
   // Ride links are for the person holding this phone.
   const isMe = (person?.id ?? data.meId) === data.meId;
+  const places = { home: data.home, stay: trip.stay };
   const share = () =>
     Share.share({ message: tripChecklistText(mine, data.items, data.owners, formatLocalDate) }).catch(() => {});
   const days = formatTripDays(plan, now.getFullYear());
@@ -223,20 +224,35 @@ function TripDetail({ trip }: { trip: Trip }) {
       ) : null}
       {plan.flight ? (
         <Journey label="Getting there" f={plan.flight} lead>
-          {isMe ? <JourneyRides f={plan.flight} leave={steps.find((s) => s.kind === 'leave')} home={false} dark /> : null}
+          {isMe ? <JourneyRides f={plan.flight} leave={steps.find((s) => s.kind === 'leave')} home={false} places={places} dark /> : null}
         </Journey>
       ) : null}
       {plan.returnFlight ? (
         <Journey label="Coming home" f={plan.returnFlight}>
-          {isMe ? <JourneyRides f={plan.returnFlight} leave={steps.find((s) => s.kind === 'returnLeave')} home /> : null}
+          {isMe ? <JourneyRides f={plan.returnFlight} leave={steps.find((s) => s.kind === 'returnLeave')} home places={places} /> : null}
         </Journey>
+      ) : null}
+      {plan.flight || plan.returnFlight ? (
+        <Pressable
+          style={styles.stay}
+          onPress={() => router.push({ pathname: '/place', params: { kind: 'stay', trip: trip.id } })}
+          accessibilityRole="button"
+        >
+          <View style={{ flex: 1 }}>
+            <Text style={styles.stayLabel}>Staying at</Text>
+            <Text style={[styles.stayName, !trip.stay && styles.stayAdd]}>
+              {trip.stay ? trip.stay.name || 'Pin added' : 'Add the hotel’s pin, so Uber and your driver know where to go'}
+            </Text>
+          </View>
+          <Text style={styles.chevron}>›</Text>
+        </Pressable>
       ) : null}
       <Text style={styles.sectionHeading}>Day by day</Text>
       <Timeline
         steps={steps}
         now={now}
         itemsFor={(s) => stepItemNames(plan, data.items, s, data.owners)}
-        actionFor={isMe ? (s) => stepAction(s, steps, plan, data.driverTemplates) : undefined}
+        actionFor={isMe ? (s) => stepAction(s, steps, plan, data.driverTemplates, places) : undefined}
         doneFor={(s) => {
           const d = stepDone(trip, planId, s, steps);
           return d ? doneLabel(d, data.owners, data.meId, deviceZone(), now) : undefined;
@@ -356,6 +372,10 @@ const styles = StyleSheet.create({
     paddingHorizontal: space.m,
     paddingVertical: 7,
   },
+  stay: { flexDirection: 'row', alignItems: 'center', backgroundColor: colors.card, borderRadius: 16, borderWidth: StyleSheet.hairlineWidth, borderColor: colors.border, padding: space.l, marginTop: space.m },
+  stayLabel: { fontSize: 12, fontWeight: '600', letterSpacing: 0.8, textTransform: 'uppercase', color: colors.muted },
+  stayName: { fontSize: 16, fontFamily: fonts.bold, color: colors.text, marginTop: 2 },
+  stayAdd: { fontSize: 15, fontFamily: undefined, fontWeight: '600', color: colors.accent },
   editFlights: { fontSize: 14, color: colors.accent, fontWeight: '600', marginTop: space.s },
   footnote: { fontSize: 13, color: colors.muted, marginTop: space.l, textAlign: 'center' },
   edit: { fontSize: 16, color: colors.accent, fontWeight: '600', padding: space.s },

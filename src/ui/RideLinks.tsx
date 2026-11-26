@@ -3,7 +3,8 @@ import { Linking, Pressable, StyleSheet, Text, View } from 'react-native';
 import { AIRPORTS } from '../domain/airports';
 import { terminalPin } from '../domain/airportPins';
 import { driverMessage, rideFrom, rideTo, uberUrl, whatsappUrl } from '../domain/rides';
-import type { Ride } from '../domain/rides';
+import type { Places, Ride } from '../domain/rides';
+import type { Place } from '../domain/places';
 import { addMinutes, timeLabel, zonedToInstant } from '../domain/time';
 import { EXIT_MINUTES } from '../domain/timeline';
 import type { FlightLeg, TimelineStep } from '../domain/types';
@@ -21,6 +22,7 @@ export function RideLinks({
   fromAirport = false,
   dropoff,
   pin,
+  pickup,
   dark = false,
 }: {
   label: string;
@@ -28,6 +30,8 @@ export function RideLinks({
   fromAirport?: boolean;
   dropoff?: string;
   pin?: { lat: number; lng: number };
+  /** Where to be picked up, when it isn't simply where the phone is. */
+  pickup?: Place;
   dark?: boolean;
 }) {
   const { data } = useAppData();
@@ -43,7 +47,7 @@ export function RideLinks({
       <Pressable style={[styles.button, dark && styles.buttonDark]} onPress={() => open(whatsappUrl(text))} accessibilityRole="link" accessibilityLabel={`${label}: message a driver on WhatsApp`}>
         <Text style={[styles.buttonText, dark && styles.onNavy]}>WhatsApp</Text>
       </Pressable>
-      <Pressable style={[styles.button, dark && styles.buttonDark]} onPress={() => open(uberUrl(dropoff, pin))} accessibilityRole="link" accessibilityLabel={`${label}: open Uber`}>
+      <Pressable style={[styles.button, dark && styles.buttonDark]} onPress={() => open(uberUrl(dropoff, pin, pickup))} accessibilityRole="link" accessibilityLabel={`${label}: open Uber`}>
         <Text style={[styles.buttonText, dark && styles.onNavy]}>Uber</Text>
       </Pressable>
     </View>
@@ -81,20 +85,42 @@ const styles = StyleSheet.create({
 });
 
 /** Both rides for a journey: to the departure airport, and on from where it lands. */
-export function JourneyRides({ f, leave, home, dark = false }: { f: FlightLeg; leave?: TimelineStep; home: boolean; dark?: boolean }) {
+export function JourneyRides({
+  f,
+  leave,
+  home,
+  places = {},
+  dark = false,
+}: {
+  f: FlightLeg;
+  leave?: TimelineStep;
+  home: boolean;
+  places?: Places;
+  dark?: boolean;
+}) {
+  // Going: home to the airport, then on to the hotel. Coming home: the other way round.
+  const start = home ? places.stay : places.home;
+  const end = home ? places.home : places.stay;
   const day = (d: Date, tz: string) => d.toLocaleDateString(undefined, { weekday: 'short', day: 'numeric', month: 'short', timeZone: tz });
-  const to = rideTo(f, leave && { day: day(leave.at, leave.timeZone), time: leave.localTime }, home ? 'hotel' : 'home');
+  const to = rideTo(f, leave && { day: day(leave.at, leave.timeZone), time: leave.localTime }, home ? 'hotel' : 'home', start);
   let from: Ride | undefined;
   if (f.lands) {
     const tz = (f.destination && AIRPORTS[f.destination]?.timeZone) || f.timeZone;
     const pickup = addMinutes(zonedToInstant(f.lands, tz), EXIT_MINUTES);
-    from = rideFrom(f, { day: day(pickup, tz), time: timeLabel(pickup, tz) }, home ? 'home' : 'hotel');
+    from = rideFrom(f, { day: day(pickup, tz), time: timeLabel(pickup, tz) }, home ? 'home' : 'hotel', end);
   }
   return (
     <View>
-      <RideLinks label="Ride to the airport" ride={to} dropoff={to.to} pin={terminalPin(f.airport, f.terminal)} dark={dark} />
+      <RideLinks label="Ride to the airport" ride={to} dropoff={to.to} pin={terminalPin(f.airport, f.terminal)} pickup={start} dark={dark} />
       {from ? (
-        <RideLinks label={home ? 'Ride home' : 'Ride to the hotel'} ride={from} fromAirport dark={dark} />
+        <RideLinks
+          label={home ? 'Ride home' : 'Ride to the hotel'}
+          ride={from}
+          fromAirport
+          dropoff={end ? from.to : undefined}
+          pin={end}
+          dark={dark}
+        />
       ) : (
         <Text style={[styles.hint, dark && styles.onNavyMuted]}>Add when you land (Edit) to plan the ride from the airport.</Text>
       )}
