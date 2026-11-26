@@ -11,6 +11,7 @@ import { NotificationActions } from '../reminders/NotificationActions';
 import { RemindersProvider } from '../reminders/Reminders';
 import { configureNotifications } from '../reminders/schedule';
 import { ShareInbox } from '../share/ShareInbox';
+import { LandingFiller } from '../tickets/LandingFiller';
 import { AppDataProvider } from '../state/AppData';
 import { SyncProvider } from '../sync/SyncProvider';
 import { colors, fonts } from '../ui/theme';
@@ -34,6 +35,7 @@ export default function RootLayout() {
           <RemindersProvider>
             <NotificationActions />
             <ShareInbox />
+            <LandingFiller />
             <StatusBar style="dark" />
             <Stack
               screenOptions={{
