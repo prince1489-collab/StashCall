@@ -147,4 +147,30 @@ describe('people changed on two phones', () => {
     // The merged record goes back to the server.
     expect(changesToPush(r.data, r.state).map((x) => x.data)).toEqual([{ ...dad, passportExpires: '2030-01-01', status }]);
   });
+
+  it('keeps a step ticked on each phone, and my rename', () => {
+    const state = markPushed({}, changesToPush(mine, {}));
+    // Here: I tick my check-in and rename the trip. There: Dad ticks his ride.
+    const myTick = { 'me|checkin@2026-12-04#0': { by: 'me', at: '2026-12-04T02:00:00Z' } };
+    const dadTick = { 'b|bookRide@2026-12-05#0': { by: 'b', at: '2026-12-04T03:00:00Z' } };
+    const here = { ...mine, trips: [{ ...trip, name: 'Wedding', stepsDone: myTick }] };
+    const { tickets, ...rest } = trip;
+    const remote = { ...rest, tickets: tickets!.map(({ id, addedAt }) => ({ id, addedAt })), stepsDone: dadTick };
+    const r = applyRemote(here, state, asRows([{ kind: 'trip', id: 't1', data: remote, deleted: false }]));
+    expect(r.data.trips[0].name).toBe('Wedding');
+    expect(r.data.trips[0].stepsDone).toEqual({ ...myTick, ...dadTick });
+    expect(r.data.trips[0].tickets?.[0].uri).toBe('file:///mine.jpg');
+    // The merged trip goes back, so Dad's phone gets my tick too.
+    expect(changesToPush(r.data, r.state).map((x) => x.id)).toEqual(['t1']);
+  });
+
+  it('lets a later untick win over an earlier tick', () => {
+    const state = markPushed({}, changesToPush(mine, {}));
+    const key = 'b|checkin@2026-12-04#0';
+    const here = { ...mine, trips: [{ ...trip, stepsDone: { [key]: { by: 'me', at: '2026-12-04T05:00:00Z', undone: true as const } } }] };
+    const { tickets: _t, ...rest } = trip;
+    const remote = { ...rest, stepsDone: { [key]: { by: 'b', at: '2026-12-04T04:00:00Z' } } };
+    const r = applyRemote(here, state, asRows([{ kind: 'trip', id: 't1', data: remote, deleted: false }]));
+    expect(r.data.trips[0].stepsDone?.[key].undone).toBe(true);
+  });
 });

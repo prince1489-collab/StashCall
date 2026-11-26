@@ -4,6 +4,7 @@ import { Pressable, ScrollView, Share, StyleSheet, Text, View } from 'react-nati
 
 import { isGoing, travellers, tripFor } from '../../domain/people';
 import { tripChecklistText } from '../../domain/shareText';
+import { doneLabel, stepDone, toggleStep } from '../../domain/stepsDone';
 import { buildTimeline } from '../../domain/timeline';
 import { journeyFlights } from '../../domain/journeys';
 import { formatTripDays, pastTrips, tripSpan, upcomingTrips } from '../../domain/trips';
@@ -13,7 +14,7 @@ import { useNow } from '../../hooks/useNow';
 import { useAppData } from '../../state/AppData';
 import { useSync } from '../../sync/SyncProvider';
 import { BeforeYouGo } from '../../ui/BeforeYouGo';
-import { PrimaryButton, formatLocalDate } from '../../ui/Form';
+import { PrimaryButton, deviceZone, formatLocalDate } from '../../ui/Form';
 import { ReminderStatus } from '../../ui/ReminderStatus';
 import { BoardingPasses } from '../../ui/BoardingPasses';
 import { JourneyRides, stepAction } from '../../ui/RideLinks';
@@ -148,7 +149,7 @@ function TripRow({ trip, meta, who, onPress, past }: { trip: Trip; meta: string;
  * plan: their route, connections and day, on this phone's person first.
  */
 function TripDetail({ trip }: { trip: Trip }) {
-  const { data, viewTrip } = useAppData();
+  const { data, viewTrip, update } = useAppData();
   const now = useNow();
   const going = travellers(trip, data.owners);
   const [pid, setPid] = useState(() => (going.some((p) => p.id === data.meId) ? data.meId : going[0]?.id));
@@ -157,6 +158,8 @@ function TripDetail({ trip }: { trip: Trip }) {
   const mine = tripFor(trip, data.meId);
   const own = person && trip.personFlights?.[person.id] !== undefined;
   const steps = buildTimeline(plan);
+  // Whose plan this is: ticks on it are theirs, whoever taps them.
+  const planId = person?.id ?? data.meId;
   // Ride links are for the person holding this phone.
   const isMe = (person?.id ?? data.meId) === data.meId;
   const share = () =>
@@ -229,6 +232,11 @@ function TripDetail({ trip }: { trip: Trip }) {
         now={now}
         itemsFor={(s) => stepItemNames(plan, data.items, s, data.owners)}
         actionFor={isMe ? (s) => stepAction(s, steps, plan, data.driverTemplates) : undefined}
+        doneFor={(s) => {
+          const d = stepDone(trip, planId, s, steps);
+          return d ? doneLabel(d, data.owners, data.meId, deviceZone(), now) : undefined;
+        }}
+        onToggle={planId ? (s) => update((d) => toggleStep(d, trip.id, planId, s, steps, data.meId)) : undefined}
       />
       <Text style={styles.sectionHeading}>For everyone</Text>
       <BeforeYouGo trip={mine} />

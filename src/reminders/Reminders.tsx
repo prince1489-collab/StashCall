@@ -52,7 +52,7 @@ export function RemindersProvider({ children }: { children: ReactNode }) {
           // Only trips this person is going on: no reminders for someone else's.
           data.trips.filter((t) => isGoing(t, data.meId)).map((t) => tripFor(t, data.meId)),
           now,
-        ).flatMap((t) => [...planPrepReminders(t, data, now), ...planCheckInReminders(t, now), ...planReminders(t, data.items, now, data.owners, data.meId)]);
+        ).flatMap((t) => [...planPrepReminders(t, data, now), ...planCheckInReminders(t, now, data.meId), ...planReminders(t, data.items, now, data.owners, data.meId)]);
         setScheduled(await syncReminders(plan, data.trips.map((t) => t.id)));
       }),
     [queue, data.items, data.trips, data.insurance, data.insuranceEnds, data.passportExpires, data.owners, data.meId],

@@ -1,4 +1,5 @@
 import type { AppData } from '../storage/store';
+import { mergeStepsDone } from '../domain/stepsDone';
 import type { Item, Person, Trip } from '../domain/types';
 
 /**
@@ -8,9 +9,10 @@ import type { Item, Person, Trip } from '../domain/types';
  * listed by id and their screenshots shared through storage.
  *
  * Conflicts: the phone pulls first. A remote change replaces the local copy
- * unless this phone has an unsent change to the same thing, in which case
- * this phone's version wins and is sent. With two or three people that is
- * simple and predictable.
+ * unless this phone has an unsent change to the same thing. Then people and
+ * trips merge field by field (this phone's edits win where both changed the
+ * same field, ticked steps keep both), and anything else keeps this phone's
+ * version. The result is sent next.
  */
 
 export type RecordKind = 'trip' | 'item' | 'person' | 'prefs';
@@ -122,6 +124,14 @@ export function applyRemote(data: AppData, state: SyncState, rows: SyncRow[]): {
       changed = true;
       continue;
     }
+    // A trip changed on both phones (a step ticked there, a time edited
+    // here): merge field by field, and keep both phones' ticks.
+    if (changedHere && row.kind === 'trip' && !row.deleted && mine) {
+      next = put(next, 'trip', row.id, mergeTrip(state[key], mine.data as SharedTrip, row.data as SharedTrip));
+      nextState[key] = fingerprint(row.data);
+      changed = true;
+      continue;
+    }
     // Anything this phone made before it joined loses to the household's copy.
     if (changedHere || deletedHere) continue;
     next = row.deleted ? remove(next, row.kind, row.id) : put(next, row.kind, row.id, row.data);
@@ -205,13 +215,32 @@ function put(data: AppData, kind: RecordKind, id: string, value: unknown): AppDa
  * Two travel updates: the later one wins.
  */
 export function mergePerson(agreed: string | undefined, mine: Person, theirs: Person): Person {
+  const out = mergeFields(agreed, mine, theirs) as unknown as Record<string, unknown>;
+  if (mine.status && theirs.status) out.status = Date.parse(mine.status.at) >= Date.parse(theirs.status.at) ? mine.status : theirs.status;
+  return out as unknown as Person;
+}
+
+type SharedTrip = ReturnType<typeof shareableTrip>;
+
+/**
+ * Three-way merge of a trip, the same way as a person. Ticked steps merge
+ * one by one, the latest tap winning, so a tick on each phone keeps both.
+ */
+export function mergeTrip(agreed: string | undefined, mine: SharedTrip, theirs: SharedTrip): SharedTrip {
+  const out = mergeFields(agreed, mine, theirs);
+  const done = mergeStepsDone(mine.stepsDone, theirs.stepsDone);
+  if (done) out.stepsDone = done;
+  return out;
+}
+
+function mergeFields<T extends object>(agreed: string | undefined, mine: T, theirs: T): T {
   let base: Record<string, unknown> = {};
   try {
     base = (agreed && agreed !== DELETED ? JSON.parse(agreed) : {}) ?? {};
   } catch {
     base = {};
   }
-  const out: Record<string, unknown> = { ...theirs };
+  const out: Record<string, unknown> = { ...(theirs as Record<string, unknown>) };
   const m = mine as unknown as Record<string, unknown>;
   for (const k of new Set([...Object.keys(m), ...Object.keys(base)])) {
     if (fingerprint(m[k]) !== fingerprint(base[k])) {
@@ -219,6 +248,5 @@ export function mergePerson(agreed: string | undefined, mine: Person, theirs: Pe
       else out[k] = m[k];
     }
   }
-  if (mine.status && theirs.status) out.status = Date.parse(mine.status.at) >= Date.parse(theirs.status.at) ? mine.status : theirs.status;
-  return out as unknown as Person;
+  return out as unknown as T;
 }

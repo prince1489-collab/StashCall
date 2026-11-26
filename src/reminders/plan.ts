@@ -1,6 +1,7 @@
 import { buildTimeline } from '../domain/timeline';
 import { reminderItems } from '../domain/tripItems';
 import { checkIns } from '../domain/checkin';
+import { stepDone } from '../domain/stepsDone';
 import { prepTasks, shortDate } from '../domain/prep';
 import type { PrepPrefs, PrepTask } from '../domain/prep';
 import type { Item, Person, PrepKind, StepKind, TimelineStep, Trip } from '../domain/types';
@@ -22,9 +23,12 @@ export interface PlannedReminder {
 }
 
 /** "Check in for QP1111" when online check-in opens, a tap away from the airline. */
-export function planCheckInReminders(trip: Trip, now: Date): PlannedReminder[] {
+export function planCheckInReminders(trip: Trip, now: Date, meId?: string): PlannedReminder[] {
+  // Checked in already, and ticked it off: no nudge.
+  const steps = buildTimeline(trip);
+  const done = steps.filter((s) => s.kind === 'checkin' && stepDone(trip, meId, s, steps)).map((s) => s.at.getTime());
   return checkIns(trip)
-    .filter((c) => c.at.getTime() > now.getTime())
+    .filter((c) => c.at.getTime() > now.getTime() && !done.includes(c.at.getTime()))
     .map((c) => ({
       id: `${trip.id}:checkin:${c.flightNumbers[0]}`,
       at: c.at,
@@ -170,7 +174,8 @@ export function planReminders(trip: Trip, items: Item[], now: Date, people: Pers
   };
   const steps = buildTimeline(trip);
   const timeline = steps
-    .filter((s) => s.notify && (s.remindAt ?? s.at).getTime() > now.getTime())
+    // A step ticked off already needs no reminder.
+    .filter((s) => s.notify && (s.remindAt ?? s.at).getTime() > now.getTime() && !stepDone(trip, meId, s, steps))
     .map((s): PlannedReminder | null => {
       const names = reminderItems(trip, items, s, people, meId).map(label);
       const text = textFor(s, steps, names);
