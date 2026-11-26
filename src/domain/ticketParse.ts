@@ -75,6 +75,11 @@ export function findDates(text: string): Found<Day>[] {
   for (const m of text.matchAll(/\b(\d{1,2})[/.](\d{1,2})[/.](\d{4}|\d{2})\b/g)) {
     add(m, { d: Number(m[1]), m: Number(m[2]), y: year(m[3]) });
   }
+  // 30-11-2026, day first, as on Indian e-tickets. A full year only, so a
+  // phone number or a fare isn't read as a date.
+  for (const m of text.matchAll(/\b(\d{1,2})-(\d{1,2})-(\d{4})\b/g)) {
+    add(m, { d: Number(m[1]), m: Number(m[2]), y: year(m[3]) });
+  }
   // Overlapping matches ("Feb 19, 2027" inside "19 Feb ..."): keep the earliest, longest.
   out.sort((a, b) => a.index - b.index || b.end - a.end);
   return out.filter((f, i) => i === 0 || f.index >= out[i - 1].end);
@@ -261,6 +266,34 @@ function dropTimestamps(text: string): string {
     .replace(/\b\d{1,2}:\d{2}:\d{2}\b(?:\s*\(UTC\))?/g, ' ');
 }
 
+/**
+ * When the booking was made, not when anyone flies: "Booked on : 18-Nov-2026
+ * 19:21 HRs" would otherwise be read as the departure.
+ */
+function dropBookedOn(text: string): string {
+  return text.replace(
+    /\b(?:booked\s+on|booking\s+date|date\s+of\s+(?:booking|issue)|issued?\s+on|issue\s+date|ticketed\s+on)\b[^\n]*/gi,
+    (m) => {
+      // Blank out the label and the date and time right after it, nothing further.
+      const window = m.slice(0, 60);
+      const ends = [...findDates(window), ...findTimes(window)].map((f) => f.end);
+      const end = ends.length ? Math.max(...ends) : m.search(/:|$/) + 1;
+      return ' '.repeat(end) + m.slice(end).replace(/^\s*hrs\b/i, '');
+    },
+  );
+}
+
+/**
+ * The small print after the itinerary ("Points to remember", "Terms and
+ * conditions") mentions other places and dates: "travel to and from Dubai".
+ * Cut it, once a flight number has come before it.
+ */
+function dropFinePrint(text: string): string {
+  const m = /\n[^\n]*\b(?:points\s+to\s+remember|terms\s+(?:and|&)\s+conditions|important\s+(?:information|notes?|instructions)|fare\s+rules)\b/i.exec(text);
+  if (!m || !findFlightNumber(text.slice(0, m.index))) return text;
+  return text.slice(0, m.index);
+}
+
 function findCheckout(text: string, today: Date): LocalDateTime | undefined {
   const m = /check[\s-]?out/i.exec(text);
   if (!m) return undefined;
@@ -277,8 +310,8 @@ function findCheckout(text: string, today: Date): LocalDateTime | undefined {
  * Text comes from on-device OCR, so lines may be out of order or split.
  */
 export function parseTicketText(blocks: string[], today: Date = new Date()): TicketDetails {
-  const text = dropTimestamps(fixOcrDigits(blocks.join('\n')));
-  const flightText = text.replace(/check[\s-]?out[\s\S]*$/i, '');
+  const text = dropBookedOn(dropTimestamps(fixOcrDigits(blocks.join('\n'))));
+  const flightText = dropFinePrint(text).replace(/check[\s-]?out[\s\S]*$/i, '');
 
   // A booking with an outbound and a return flight lists two flight numbers.
   // Read each part on its own, then take the earliest as the outbound.

@@ -76,13 +76,16 @@ const lastArrival = (f: FlightDetails & { connections?: FlightDetails[] }) =>
 
 /**
  * True when a single flight read off a screenshot looks like the way home
- * for `outbound`: it leaves later, and from where the outbound landed (or
- * we can't tell the airports).
+ * for `outbound`: it leaves later, and lands where the outbound left from
+ * or leaves from where it landed (or we can't tell the airports).
  */
 export function isReturnOf(outbound: FlightLeg, f: FlightDetails): boolean {
   if (!f.departure || f.departure <= outbound.departure) return false;
+  // Back to where the trip started, even from somewhere else: out to
+  // Kanpur, home from Lucknow.
+  if (f.to && outbound.airport && f.to.code === outbound.airport) return true;
   if (f.from && outbound.destination) return f.from.code === outbound.destination;
-  if (f.to && outbound.airport) return f.to.code === outbound.airport;
+  if (f.to && outbound.airport) return false;
   return true;
 }
 
