@@ -1,4 +1,5 @@
 import type { FlightDetails, TicketDetails } from './ticketParse';
+import { zonedToInstant } from './time';
 import type { FlightLeg, Trip } from './types';
 
 /**
@@ -37,10 +38,20 @@ export function fillLandings(trip: Trip, readings: TicketDetails[]): Trip | unde
   return changed ? next : undefined;
 }
 
-/** True when some journey on the trip has no landing time yet. */
-export function needsLandings(trip: Trip): boolean {
+/**
+ * True when some journey on the trip has no landing time yet and hasn't
+ * landed: its last flight left less than a day ago, or is still to come.
+ * (A flight in the air counts: that's when the ride from the airport matters.)
+ */
+export function needsLandings(trip: Trip, now: Date = new Date()): boolean {
   const legs = [trip.flight, trip.returnFlight, ...Object.values(trip.personFlights ?? {}).flatMap((p) => [p.flight, p.returnFlight])];
-  return legs.some((l) => l && !l.lands);
+  return legs.some((l) => {
+    if (!l || l.lands) return false;
+    const last = l.connections?.length ? l.connections[l.connections.length - 1] : l;
+    return zonedToInstant(last.departure, last.timeZone).getTime() > now.getTime() - DAY_MS;
+  });
 }
+
+const DAY_MS = 24 * 60 * 60 * 1000;
 
 const norm = (n?: string) => n?.replace(/\s+/g, '').toUpperCase();

@@ -142,6 +142,11 @@ export interface Trip {
   itemIds: string[];
   /** Screenshots of tickets, boarding passes or bookings, kept on the phone. */
   tickets?: Ticket[];
+  /**
+   * Tickets already read for landing times, by id: each is read once, so a
+   * landing time the user removed stays removed.
+   */
+  landsRead?: string[];
   /** This phone's own boarding passes: kept on the phone for the gate, never shared. */
   passes?: Ticket[];
   /** Things sorted before travel day, such as insurance and visas. */

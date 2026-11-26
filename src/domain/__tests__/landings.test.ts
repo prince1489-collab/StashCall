@@ -36,3 +36,12 @@ describe('landing times from saved tickets', () => {
     expect(needsLandings(trip)).toBe(true);
   });
 });
+
+describe('which trips still need landing times', () => {
+  it('counts a journey in the air, and stops a day after its last flight left', () => {
+    const oneWay: Trip = { ...trip, returnFlight: undefined, personFlights: undefined };
+    // 6E7415 left Delhi at 12:00 IST (06:30 UTC); not landed yet.
+    expect(needsLandings(oneWay, new Date('2026-12-06T07:00:00Z'))).toBe(true);
+    expect(needsLandings(oneWay, new Date('2026-12-07T07:00:00Z'))).toBe(false);
+  });
+});
