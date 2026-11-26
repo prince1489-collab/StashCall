@@ -5,6 +5,8 @@ import { AppState } from 'react-native';
 
 import { useAppData } from '../state/AppData';
 import { ensureSignedIn, SHARING_SET_UP, supabase } from './client';
+import { newStatuses } from '../domain/status';
+import { notifyFamily } from '../reminders/schedule';
 import { applyRemote, changesToPush, markPushed } from './records';
 import type { SyncRow, SyncState } from './records';
 import { toDownload } from './ticketPlan';
@@ -101,11 +103,14 @@ export function SyncProvider({ children }: { children: ReactNode }) {
         // Only touch the app's data when something actually changed, or an idle
         // phone would keep re-saving and re-syncing the same rows.
         if (preview.changed) {
+          let told: string[] = [];
           await update((d) => {
             const r = applyRemote(d, state, rows as SyncRow[]);
             state = r.state;
+            told = newStatuses(d.owners, r.data.owners, r.data.meId, new Date());
             return r.data;
           });
+          for (const t of told) notifyFamily(t).catch(() => {});
         } else {
           state = preview.state;
         }

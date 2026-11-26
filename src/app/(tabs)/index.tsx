@@ -15,6 +15,7 @@ import { Checklist } from '../../ui/Checklist';
 import { Logo } from '../../ui/Icons';
 import { PrimaryButton, formatLocalDate } from '../../ui/Form';
 import { ReminderStatus } from '../../ui/ReminderStatus';
+import { FamilyStatus } from '../../ui/FamilyStatus';
 import { Tickets } from '../../ui/Tickets';
 import { colors, fonts, space } from '../../ui/theme';
 
@@ -150,6 +151,7 @@ export default function Today() {
           />
         </View>
       )}
+      <FamilyStatus trip={currentTrip} now={now} />
       {next ? <BeforeYouGo trip={currentTrip} compact /> : null}
       {soon ? <Tickets trip={currentTrip} compact /> : null}
       <ReminderStatus problemsOnly />
