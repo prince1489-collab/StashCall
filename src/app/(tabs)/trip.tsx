@@ -2,7 +2,7 @@ import { Link, router } from 'expo-router';
 import { useState } from 'react';
 import { Pressable, ScrollView, Share, StyleSheet, Text, View } from 'react-native';
 
-import { travellers, tripFor } from '../../domain/people';
+import { isGoing, travellers, tripFor } from '../../domain/people';
 import { tripChecklistText } from '../../domain/shareText';
 import { buildTimeline } from '../../domain/timeline';
 import { journeyFlights } from '../../domain/journeys';
@@ -22,6 +22,8 @@ import { colors, fonts, space } from '../../ui/theme';
 export default function TripScreen() {
   const { data, currentTrip, viewingId, ready } = useAppData();
   if (!ready) return null;
+  // With more than one trip, the tab opens on the list. Tap one to open it.
+  if (data.trips.length > 1 && !viewingId) return <TripList />;
 
   if (!currentTrip) {
     return (
@@ -30,12 +32,10 @@ export default function TripScreen() {
         <Text style={styles.emptyText}>
           Add your flight time or hotel checkout. StashCall works out the rest.
         </Text>
-        <PrimaryButton label="Add a trip" onPress={() => router.push('/trip/edit')} />
+        <PrimaryButton label="Add a trip" onPress={() => router.push({ pathname: '/trip/edit', params: { new: '1' } })} />
       </View>
     );
   }
-  // With more than one trip, the tab opens on the list. Tap one to open it.
-  if (data.trips.length > 1 && !viewingId) return <TripList />;
   return <TripDetail key={currentTrip.id} trip={currentTrip} />;
 }
 
@@ -65,11 +65,16 @@ function TripList() {
   const { data, viewTrip } = useAppData();
   const now = useNow();
   const [showPast, setShowPast] = useState(false);
+  const [showOthers, setShowOthers] = useState(false);
   // Judged as this phone's person travels, as reminders are.
   const mine = (t: Trip) => tripFor(t, data.meId);
+  // Trips this person isn't going on fold away below.
+  const own = data.trips.filter((t) => isGoing(t, data.meId));
+  const notMine = data.trips.filter((t) => !isGoing(t, data.meId));
+  const others = [...upcomingTrips(notMine, now), ...pastTrips(notMine, now)];
   const byId = new Map(data.trips.map((t) => [t.id, t]));
-  const coming = upcomingTrips(data.trips.map(mine), now).map((t) => byId.get(t.id)!);
-  const over = pastTrips(data.trips.map(mine), now).map((t) => byId.get(t.id)!);
+  const coming = upcomingTrips(own.map(mine), now).map((t) => byId.get(t.id)!);
+  const over = pastTrips(own.map(mine), now).map((t) => byId.get(t.id)!);
   const [next, ...later] = coming;
   const year = now.getFullYear();
   const meta = (t: Trip) => [formatTripDays(mine(t), year), mine(t).flight ? route(mine(t).flight!) : undefined].filter(Boolean).join(' · ');
@@ -107,6 +112,14 @@ function TripList() {
       ) : null}
       {showPast
         ? over.map((t) => <TripRow key={t.id} trip={t} meta={meta(t)} who={goingNames(t, data.owners)} onPress={() => viewTrip(t.id)} past />)
+        : null}
+      {others.length > 0 ? (
+        <Text style={styles.pastToggle} onPress={() => setShowOthers(!showOthers)} accessibilityRole="button" accessibilityState={{ expanded: showOthers }}>
+          {showOthers ? "Hide trips you're not on" : `Trips you're not on (${others.length}) ›`}
+        </Text>
+      ) : null}
+      {showOthers
+        ? others.map((t) => <TripRow key={t.id} trip={t} meta={meta(t)} who={goingNames(t, data.owners)} onPress={() => viewTrip(t.id)} past />)
         : null}
     </ScrollView>
   );

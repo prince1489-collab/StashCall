@@ -65,7 +65,7 @@ export default function Today() {
             </View>
           ))}
         </View>
-        <PrimaryButton label="Add your first trip" onPress={() => router.push('/trip/edit')} />
+        <PrimaryButton label="Add your first trip" onPress={() => router.push({ pathname: '/trip/edit', params: { new: '1' } })} />
         <Text style={styles.tip}>
           Got a booking email or boarding pass? Screenshot it, then share it to StashCall from your gallery. It fills in
           the trip for you.

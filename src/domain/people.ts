@@ -6,6 +6,14 @@ import type { FlightLeg, Item, LocalDate, Person, PersonFlights, Trip } from './
  * and whose items this phone reminds about. Pure functions, like household.ts.
  */
 
+/**
+ * Whether this phone's person is on a trip. A trip with no list takes
+ * everyone, and a phone that hasn't said who it is sees every trip.
+ */
+export function isGoing(trip: Pick<Trip, 'travellerIds'>, meId: string | undefined): boolean {
+  return !trip.travellerIds || !meId || trip.travellerIds.includes(meId);
+}
+
 /** People going on a trip. A trip with no list takes everyone. */
 export function travellers(trip: Pick<Trip, 'travellerIds'>, people: Person[]): Person[] {
   if (!trip.travellerIds) return people;

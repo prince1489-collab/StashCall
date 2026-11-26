@@ -2,7 +2,7 @@ import { createContext, useCallback, useContext, useEffect, useMemo, useRef, use
 import type { ReactNode } from 'react';
 import { AppState } from 'react-native';
 
-import { tripFor } from '../domain/people';
+import { isGoing, tripFor } from '../domain/people';
 import { upcomingTrips } from '../domain/trips';
 import { useAppData } from '../state/AppData';
 import { planPrepReminders, planReminders } from './plan';
@@ -49,7 +49,8 @@ export function RemindersProvider({ children }: { children: ReactNode }) {
         // Every trip still to come, as this phone's person travels it.
         // Each trip as this person flies it first, so a later flight of their own still counts as to come.
         const plan = upcomingTrips(
-          data.trips.map((t) => tripFor(t, data.meId)),
+          // Only trips this person is going on: no reminders for someone else's.
+          data.trips.filter((t) => isGoing(t, data.meId)).map((t) => tripFor(t, data.meId)),
           now,
         ).flatMap((t) => [...planPrepReminders(t, data, now), ...planReminders(t, data.items, now, data.owners, data.meId)]);
         setScheduled(await syncReminders(plan, data.trips.map((t) => t.id)));
