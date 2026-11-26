@@ -29,13 +29,20 @@ export function LandingFiller() {
     (async () => {
       for (const t of todo) {
         const readings: TicketDetails[] = [];
-        for (const k of t.tickets) readings.push((await readTicket(k.uri)).details);
+        const done: string[] = [];
+        for (const k of t.tickets) {
+          const r = await readTicket(k.uri);
+          readings.push(r.details);
+          // A ticket the reader couldn't open (still downloading, say) is tried again next time.
+          if (!r.error) done.push(k.id);
+          else read.delete(k.id);
+        }
         await update((d) => ({
           ...d,
           trips: d.trips.map((x) => {
             if (x.id !== t.id) return x;
             // Remember these were read, found or not, on every phone.
-            const landsRead = [...new Set([...(x.landsRead ?? []), ...t.tickets.map((k) => k.id)])];
+            const landsRead = [...new Set([...(x.landsRead ?? []), ...done])];
             return { ...(fillLandings(x, readings) ?? x), landsRead };
           }),
         }));
