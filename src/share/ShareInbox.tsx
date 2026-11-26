@@ -11,7 +11,7 @@ import type { Ticket, Trip } from '../domain/types';
 import { useAppData } from '../state/AppData';
 import { keepTicket } from '../storage/photos';
 import { newId } from '../storage/store';
-import { readProblem, readTicket } from '../tickets/readTicket';
+import { readPdfTicket, readProblem, readTicket } from '../tickets/readTicket';
 
 /** True when the screenshot is about the trip we already have. */
 function sameTrip(trip: Trip, d: TicketDetails): boolean {
@@ -28,8 +28,8 @@ function tripIsOver(trip: Trip): boolean {
 }
 
 /**
- * Receives images shared to StashCall from another app (Gallery, WhatsApp,
- * an airline app). Each is read on the phone: a ticket for a new flight or
+ * Receives images and PDFs shared to StashCall from another app (Gallery,
+ * WhatsApp, Gmail, an airline app). Each is read on the phone: a ticket for a new flight or
  * stay opens a filled-in new trip; otherwise the images are kept with the
  * current trip. Renders nothing.
  */
@@ -39,11 +39,15 @@ export function ShareInbox() {
 
   useEffect(() => {
     if (!ready || !hasShareIntent) return;
-    const images = (shareIntent.files ?? []).filter((f) => f.mimeType?.startsWith('image/'));
+    const files = shareIntent.files ?? [];
+    const images = files.filter((f) => f.mimeType?.startsWith('image/'));
+    // A PDF fills in the trip from its own text. It isn't kept with the
+    // tickets, which are pictures that open at the gate without signal.
+    const pdfs = files.filter((f) => f.mimeType === 'application/pdf' || /\.pdf$/i.test(f.fileName ?? f.path ?? ''));
     resetShareIntent();
 
-    if (images.length === 0) {
-      Alert.alert('Share an image', 'StashCall can keep screenshots of tickets and bookings. Share a picture instead.');
+    if (images.length === 0 && pdfs.length === 0) {
+      Alert.alert('Share a ticket', 'StashCall reads screenshots and PDFs of tickets and bookings. Share one of those instead.');
       return;
     }
 
@@ -56,7 +60,7 @@ export function ShareInbox() {
           // Skip a file we couldn't read; keep the rest.
         }
       }
-      if (kept.length === 0) {
+      if (kept.length === 0 && pdfs.length === 0) {
         Alert.alert("Couldn't save that", 'Try again, or add the screenshot from the Trip tab.');
         return;
       }
@@ -65,6 +69,7 @@ export function ShareInbox() {
       // there and the way home. The first one with a flight or stay decides
       // where they go.
       const readings = [];
+      for (const f of pdfs) readings.push(await readPdfTicket(f.path));
       for (const t of kept) readings.push(await readTicket(t.uri));
       const all = readings.map((r) => r.details).filter(hasTripDetails);
       const details: TicketDetails = all[0] ?? readings[0]?.details ?? {};
@@ -112,6 +117,11 @@ export function ShareInbox() {
         return;
       }
 
+      if (kept.length === 0) {
+        // Only PDFs, and they match this trip as it is.
+        Alert.alert('Already in your trip', `That booking matches ${currentTrip.name}, so nothing needed changing.`);
+        return;
+      }
       await update((d) => addTickets(d, currentTrip.id, kept));
       viewTrip(currentTrip.id);
       router.navigate('/trip');
