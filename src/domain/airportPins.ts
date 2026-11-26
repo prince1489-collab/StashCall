@@ -19,3 +19,13 @@ export function terminalPin(code: string | undefined, terminal?: string): { lat:
   const p = (t && PINS[`${code}:T${t}`]) || PINS[code];
   return p ? { lat: p[0], lng: p[1] } : undefined;
 }
+
+/**
+ * Somewhere at the airport, for working out roughly how far away it is:
+ * the terminal's pin, or any of its terminals' when we don't know which.
+ */
+export function airportPoint(code: string | undefined, terminal?: string): { lat: number; lng: number } | undefined {
+  if (!code) return undefined;
+  const p = terminalPin(code, terminal) ?? Object.entries(PINS).find(([k]) => k.split(':')[0] === code)?.[1];
+  return Array.isArray(p) ? { lat: p[0], lng: p[1] } : p;
+}

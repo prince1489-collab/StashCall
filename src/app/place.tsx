@@ -1,11 +1,16 @@
 import { router, useLocalSearchParams } from 'expo-router';
 import { useRef, useState } from 'react';
-import { Linking, ScrollView, StyleSheet, Text, TextInput } from 'react-native';
+import { Alert, Linking, ScrollView, StyleSheet, Text, TextInput } from 'react-native';
 
+import { describeChanges, withHomeTimes, withStayTimes } from '../domain/driveTime';
+import type { DriveChange } from '../domain/driveTime';
+import { isGoing } from '../domain/people';
+import { upcomingTrips } from '../domain/trips';
+import type { Trip } from '../domain/types';
 import { isShortMapsLink, mapsLink, parsePin, pinLabel } from '../domain/places';
 import type { Place } from '../domain/places';
 import { useAppData } from '../state/AppData';
-import { PrimaryButton, Section } from '../ui/Form';
+import { PrimaryButton, Section, formatMinutes } from '../ui/Form';
 import { colors, space } from '../ui/theme';
 
 /**
@@ -50,13 +55,41 @@ export default function PlaceScreen() {
     }
   };
 
-  const save = async (place: Place | undefined) => {
-    await update((d) =>
-      stay
-        ? { ...d, trips: d.trips.map((t) => (t.id === tripId ? { ...t, stay: place } : t)) }
-        : { ...d, home: place },
-    );
+  const save = async (place: Place | undefined, timed?: Map<string, Trip>) => {
+    await update((d) => {
+      const trips = d.trips.map((t) => {
+        const base = timed?.get(t.id) ?? t;
+        return stay && t.id === tripId ? { ...base, stay: place } : base;
+      });
+      return stay ? { ...d, trips } : { ...d, trips, home: place };
+    });
     router.back();
+  };
+
+  /**
+   * Saves the pin, first offering the drive times it gives: the hotel to
+   * its airports for everyone on the trip, or home to the airports on this
+   * person's coming trips.
+   */
+  const saveWithTimes = (place: Place) => {
+    const timed = new Map<string, Trip>();
+    const changes: DriveChange[] = [];
+    const targets = stay ? [trip!] : upcomingTrips(data.trips, new Date()).filter((t) => isGoing(t, data.meId));
+    for (const t of targets) {
+      const r = stay ? withStayTimes(t, place) : withHomeTimes(t, data.meId, place);
+      if (r.changes.length === 0) continue;
+      timed.set(t.id, r.trip);
+      for (const c of r.changes) if (!changes.some((x) => x.airport === c.airport)) changes.push(c);
+    }
+    if (changes.length === 0) return save(place);
+    Alert.alert(
+      'Use these drive times?',
+      `${describeChanges(changes, formatMinutes)}\n\nWorked out from the map, without traffic. Your plan moves to match, and you can still change them under Edit trip.`,
+      [
+        { text: 'Keep my times', style: 'cancel', onPress: () => save(place) },
+        { text: 'Use them', onPress: () => save(place, timed) },
+      ],
+    );
   };
 
   if (stay && !trip) return null;
@@ -103,7 +136,7 @@ export default function PlaceScreen() {
       ) : pinText.trim() && !looking && !problem && !isShortMapsLink(pinText) ? (
         <Text style={styles.problem}>{NO_PIN}</Text>
       ) : null}
-      <PrimaryButton label="Save" onPress={() => save(pin && { ...pin, ...(clean && { name: clean }) })} disabled={!pin} />
+      <PrimaryButton label="Save" onPress={() => pin && saveWithTimes({ ...pin, ...(clean && { name: clean }) })} disabled={!pin} />
       {saved ? (
         <Text style={styles.remove} onPress={() => save(undefined)} accessibilityRole="button">
           Remove {stay ? 'the hotel' : 'home'}
