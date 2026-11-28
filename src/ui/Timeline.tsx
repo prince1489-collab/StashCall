@@ -1,3 +1,5 @@
+import { router } from 'expo-router';
+import type { Href } from 'expo-router';
 import { useState } from 'react';
 import { Linking, Pressable, StyleSheet, Text, View } from 'react-native';
 
@@ -96,7 +98,8 @@ export function Timeline({
                         </Text>
                       ) : null}
                       {action ? (
-                        <Text style={styles.link} onPress={() => Linking.openURL(action.url).catch(() => {})} accessibilityRole="link">
+                        <Text style={styles.link} onPress={() => (action.url.startsWith('/') ? router.push(action.url as Href) : Linking.openURL(action.url).catch(() => {}))}
+                          accessibilityRole="link">
                           {action.label} ›
                         </Text>
                       ) : null}

@@ -54,6 +54,7 @@ export default function RootLayout() {
               <Stack.Screen name="household" options={{ title: 'Family sharing' }} />
               <Stack.Screen name="driver-message" options={{ title: 'Driver message' }} />
               <Stack.Screen name="place" options={{ title: 'Pin on the map' }} />
+              <Stack.Screen name="checkin" options={{ title: 'Check in' }} />
               <Stack.Screen name="join" options={{ headerShown: false }} />
             </Stack>
           </RemindersProvider>
