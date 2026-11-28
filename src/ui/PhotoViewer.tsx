@@ -1,18 +1,27 @@
 import { useEffect, useRef, useState } from 'react';
-import { Animated, FlatList, Modal, PanResponder, StyleSheet, Text, View, useWindowDimensions } from 'react-native';
+import { Animated, Image, Modal, PanResponder, StyleSheet, Text, View, useWindowDimensions } from 'react-native';
 import type { GestureResponderEvent, PanResponderGestureState } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import type { Ticket } from '../domain/types';
 import { space } from './theme';
 
-const MAX_ZOOM = 5;
+const MAX_ZOOM = 8;
+/** What the Zoom button steps through, then back to 1. */
+const STEPS = [2.5, 5];
 const DOUBLE_TAP_MS = 350;
+/** Further than this, a touch is a drag, not a tap. */
+const TAP_SLOP = 12;
 
 /**
- * Full-screen photos: swipe left and right through them, pinch or double-tap
- * to zoom into one (the small print on a boarding pass), drag to look around
- * while zoomed. `light` puts them on white, so a scanner reads a barcode.
+ * Full-screen photos: swipe left and right through them, pinch or
+ * double-tap to zoom into one (the small print on a boarding pass), drag
+ * to look around while zoomed. `light` puts them on white, so a scanner
+ * reads a barcode.
+ *
+ * Every touch is handled here in JS, paging included: a native scrolling
+ * pager on Android takes a two-finger move for a swipe before a pinch can
+ * claim it.
  */
 export function PhotoViewer({
   photos,
@@ -32,19 +41,181 @@ export function PhotoViewer({
 }) {
   const insets = useSafeAreaInsets();
   const { width } = useWindowDimensions();
+  const [height, setHeight] = useState(0);
   const start = Math.max(0, photos.findIndex((p) => p.id === openId));
   const [index, setIndex] = useState(start);
-  const [zoomed, setZoomed] = useState(false);
-  const [height, setHeight] = useState(0);
-  // Each photo's zoom toggle, for the Zoom button.
-  const toggles = useRef(new Map<string, () => void>()).current;
+  const [level, setLevel] = useState(1);
+
+  const pageX = useRef(new Animated.Value(-start * width)).current;
+  const scale = useRef(new Animated.Value(1)).current;
+  const tx = useRef(new Animated.Value(0)).current;
+  const ty = useRef(new Animated.Value(0)).current;
+
+  // Read by the touch handlers, which are made once.
+  const live = useRef({ index: start, count: photos.length, w: width, h: 1, left: 0, top: 0 }).current;
+  const stage = useRef<{ measure: (cb: (x: number, y: number, w: number, h: number, left: number, top: number) => void) => void } | null>(null);
+  live.count = photos.length;
+  live.w = width;
+  live.h = height || 1;
+  // The zoom as it is now, and as it was when the current stretch of the gesture began.
+  const z = useRef({ k: 1, x: 0, y: 0, k0: 1, x0: 0, y0: 0, d0: 0, fx0: 0, fy0: 0, ox: 0, oy: 0, fingers: 0, mode: 'none' as Mode, moved: false, lastTap: 0, startAt: 0 }).current;
+
+  const resetZoom = () => {
+    z.k = 1;
+    z.x = 0;
+    z.y = 0;
+    scale.setValue(1);
+    tx.setValue(0);
+    ty.setValue(0);
+    setLevel(1);
+  };
+
+  const goTo = (i: number, animate = true) => {
+    const next = Math.max(0, Math.min(live.count - 1, i));
+    if (next !== live.index) resetZoom();
+    live.index = next;
+    setIndex(next);
+    if (animate) Animated.spring(pageX, { toValue: -next * live.w, useNativeDriver: true, bounciness: 0, speed: 20 }).start();
+    else pageX.setValue(-next * live.w);
+  };
+
   useEffect(() => {
-    setIndex(start);
-    setZoomed(false);
+    if (!openId) return;
+    resetZoom();
+    goTo(start, false);
   }, [openId]); // eslint-disable-line react-hooks/exhaustive-deps
+
+  // Keep the page in place if the phone turns.
+  useEffect(() => {
+    pageX.setValue(-live.index * width);
+  }, [width]); // eslint-disable-line react-hooks/exhaustive-deps
+
+  const clamp = (x: number, y: number, k: number) => {
+    const maxX = ((k - 1) * live.w) / 2;
+    const maxY = ((k - 1) * live.h) / 2;
+    return { x: Math.max(-maxX, Math.min(maxX, x)), y: Math.max(-maxY, Math.min(maxY, y)) };
+  };
+  const show = (k: number, x: number, y: number) => {
+    const c = clamp(x, y, k);
+    z.k = k;
+    z.x = c.x;
+    z.y = c.y;
+    scale.setValue(k);
+    tx.setValue(c.x);
+    ty.setValue(c.y);
+  };
+  /** Springs to a zoom, snapping back to the whole photo below about 1x. */
+  const settle = (k: number, x: number, y: number) => {
+    const kk = k <= 1.02 ? 1 : Math.min(MAX_ZOOM, k);
+    const c = kk === 1 ? { x: 0, y: 0 } : clamp(x, y, kk);
+    z.k = kk;
+    z.x = c.x;
+    z.y = c.y;
+    Animated.parallel([
+      Animated.spring(scale, { toValue: kk, useNativeDriver: true, bounciness: 0 }),
+      Animated.spring(tx, { toValue: c.x, useNativeDriver: true, bounciness: 0 }),
+      Animated.spring(ty, { toValue: c.y, useNativeDriver: true, bounciness: 0 }),
+    ]).start();
+    setLevel(kk);
+  };
+  /** Zooms to `k` keeping the point `p` (from the photo's centre) where it is on screen. */
+  const zoomAt = (k: number, px: number, py: number) => settle(k, px - ((px - z.x) * k) / z.k, py - ((py - z.y) * k) / z.k);
+
+  /** Where the fingers are, from the photo's centre, and how far apart. */
+  const fingers = (e: GestureResponderEvent) => {
+    const t = e.nativeEvent.touches;
+    const n = t.length || 1;
+    let x = 0;
+    let y = 0;
+    // Page positions: a finger's position within a view shifts as the photo moves under it.
+    for (const p of t) {
+      x += p.pageX - live.left;
+      y += p.pageY - live.top;
+    }
+    const d = t.length >= 2 ? Math.hypot(t[0].pageX - t[1].pageX, t[0].pageY - t[1].pageY) : 0;
+    return { fx: x / n - live.w / 2, fy: y / n - live.h / 2, d, n: t.length };
+  };
+
+  /** A finger was added or lifted: carry on from where things are now. */
+  const rebase = (e: GestureResponderEvent, g: PanResponderGestureState) => {
+    const f = fingers(e);
+    z.k0 = z.k;
+    z.x0 = z.x;
+    z.y0 = z.y;
+    z.d0 = f.d;
+    z.fx0 = f.fx;
+    z.fy0 = f.fy;
+    z.ox = g.dx;
+    z.oy = g.dy;
+    z.fingers = f.n;
+    if (f.n >= 2) z.mode = 'pinch';
+    else if (z.mode !== 'page') z.mode = z.k > 1 ? 'pan' : 'page';
+  };
+
+  const responder = useRef(
+    PanResponder.create({
+      onStartShouldSetPanResponder: () => true,
+      onMoveShouldSetPanResponder: () => true,
+      onPanResponderTerminationRequest: () => false,
+      onPanResponderGrant: (e, g) => {
+        z.mode = 'none';
+        z.moved = false;
+        z.startAt = Date.now();
+        rebase(e, g);
+      },
+      onPanResponderMove: (e, g) => {
+        if (Math.abs(g.dx) > TAP_SLOP || Math.abs(g.dy) > TAP_SLOP || e.nativeEvent.touches.length >= 2) z.moved = true;
+        if (e.nativeEvent.touches.length !== z.fingers) rebase(e, g);
+        if (z.mode === 'pinch' && e.nativeEvent.touches.length >= 2) {
+          const f = fingers(e);
+          const k = Math.max(1, Math.min(MAX_ZOOM, (z.k0 * f.d) / (z.d0 || f.d)));
+          // The point under the fingers stays under them, and follows them.
+          show(k, f.fx - ((z.fx0 - z.x0) * k) / z.k0, f.fy - ((z.fy0 - z.y0) * k) / z.k0);
+        } else if (z.mode === 'pan') {
+          show(z.k, z.x0 + g.dx - z.ox, z.y0 + g.dy - z.oy);
+        } else if (z.mode === 'page') {
+          let dx = g.dx - z.ox;
+          // Pull against the ends with resistance.
+          if ((live.index === 0 && dx > 0) || (live.index === live.count - 1 && dx < 0)) dx /= 3;
+          pageX.setValue(-live.index * live.w + dx);
+        }
+      },
+      onPanResponderRelease: (e, g) => {
+        const tap = !z.moved && Date.now() - z.startAt < 300;
+        if (tap) {
+          const now = Date.now();
+          if (now - z.lastTap < DOUBLE_TAP_MS) {
+            z.lastTap = 0;
+            const f = fingers({ nativeEvent: { ...e.nativeEvent, touches: e.nativeEvent.changedTouches } } as GestureResponderEvent);
+            if (z.k > 1) settle(1, 0, 0);
+            else zoomAt(STEPS[0], f.fx, f.fy);
+          } else z.lastTap = now;
+          return;
+        }
+        if (z.mode === 'page') {
+          const dx = g.dx - z.ox;
+          const turn = Math.abs(dx) > live.w * 0.2 || Math.abs(g.vx) > 0.4;
+          goTo(turn ? live.index + (dx < 0 ? 1 : -1) : live.index);
+        } else settle(z.k, z.x, z.y);
+        z.mode = 'none';
+      },
+      onPanResponderTerminate: () => {
+        settle(z.k, z.x, z.y);
+        goTo(live.index);
+        z.mode = 'none';
+      },
+    }),
+  ).current;
+
+  const stepZoom = () => {
+    const next = STEPS.find((k) => k > z.k + 0.05);
+    if (next) zoomAt(next, 0, 0);
+    else settle(1, 0, 0);
+  };
 
   const current = photos[Math.min(index, photos.length - 1)];
   const fg = light ? '#000' : '#fff';
+  const zoomLabel = level >= STEPS[STEPS.length - 1] - 0.05 ? 'Zoom out' : 'Zoom in';
   return (
     <Modal visible={!!openId && photos.length > 0} animationType="fade" onRequestClose={onClose}>
       <View style={[styles.viewer, { backgroundColor: light ? '#fff' : '#000', paddingTop: insets.top }]}>
@@ -53,25 +224,39 @@ export function PhotoViewer({
             {index + 1} of {photos.length}
           </Text>
         ) : null}
-        <FlatList
-          data={photos}
-          keyExtractor={(p) => p.id}
-          horizontal
-          pagingEnabled
-          style={styles.list}
-          onLayout={(e) => setHeight(e.nativeEvent.layout.height)}
-          // Swiping moves to the next photo, except while looking around a zoomed one.
-          scrollEnabled={!zoomed}
-          initialScrollIndex={start}
-          getItemLayout={(_, i) => ({ length: width, offset: width * i, index: i })}
-          showsHorizontalScrollIndicator={false}
-          onMomentumScrollEnd={(e) => setIndex(Math.round(e.nativeEvent.contentOffset.x / width))}
-          renderItem={({ item }) => (
-            <View style={{ width, height }}>
-              <ZoomImage uri={item.uri} label={label} onZoom={setZoomed} register={(t) => (t ? toggles.set(item.id, t) : toggles.delete(item.id))} />
-            </View>
-          )}
-        />
+        <View
+          ref={stage as never}
+          style={styles.stage}
+          onLayout={(e) => {
+            setHeight(e.nativeEvent.layout.height);
+            stage.current?.measure((_x, _y, _w, _h, left, top) => {
+              live.left = left;
+              live.top = top;
+            });
+          }}
+          {...responder.panHandlers}
+        >
+          <Animated.View style={[styles.row, { width: width * photos.length, transform: [{ translateX: pageX }] }]}>
+            {photos.map((p, i) => (
+              <View key={p.id} style={[styles.page, { width, height }]}>
+                {/* Only pages near the one showing load their picture. */}
+                {Math.abs(i - index) <= 1 ? (
+                  i === index ? (
+                    <Animated.Image
+                      source={{ uri: p.uri }}
+                      resizeMode="contain"
+                      accessibilityLabel={label}
+                      accessibilityHint="Pinch or double-tap to zoom"
+                      style={[styles.image, { transform: [{ translateX: tx }, { translateY: ty }, { scale }] }]}
+                    />
+                  ) : (
+                    <Image source={{ uri: p.uri }} resizeMode="contain" style={styles.image} />
+                  )
+                ) : null}
+              </View>
+            ))}
+          </Animated.View>
+        </View>
         <View style={[styles.bar, { paddingBottom: space.l + insets.bottom }]}>
           {onRemove && current ? (
             <Text style={[styles.link, { color: '#ff8a80' }]} onPress={() => onRemove(current)} accessibilityRole="button">
@@ -81,8 +266,8 @@ export function PhotoViewer({
             <View />
           )}
           {current ? (
-            <Text style={styles.link} onPress={() => toggles.get(current.id)?.()} accessibilityRole="button">
-              {zoomed ? 'Zoom out' : 'Zoom in'}
+            <Text style={styles.link} onPress={stepZoom} accessibilityRole="button">
+              {zoomLabel}
             </Text>
           ) : null}
           <Text style={styles.link} onPress={onClose} accessibilityRole="button">
@@ -94,160 +279,16 @@ export function PhotoViewer({
   );
 }
 
-/** One photo that zooms with two fingers or a double tap, and pans while zoomed. */
-function ZoomImage({
-  uri,
-  label,
-  onZoom,
-  register,
-}: {
-  uri: string;
-  label: string;
-  onZoom: (zoomed: boolean) => void;
-  /** Hands the viewer a way to zoom this photo in or out, for its Zoom button. */
-  register: (toggle: (() => void) | null) => void;
-}) {
-  // A ref, not state: the gesture handlers are made once and read it later.
-  const size = useRef({ w: 1, h: 1 }).current;
-  const scale = useRef(new Animated.Value(1)).current;
-  const tx = useRef(new Animated.Value(0)).current;
-  const ty = useRef(new Animated.Value(0)).current;
-  // Where things stood when the current gesture began.
-  const s = useRef({ scale: 1, x: 0, y: 0, pinch: 0, lastTap: 0, nowScale: 1, nowX: 0, nowY: 0, ox: 0, oy: 0, fingers: 0, doubleTap: false }).current;
-
-  const clamp = (x: number, y: number, k: number) => {
-    const maxX = ((k - 1) * size.w) / 2;
-    const maxY = ((k - 1) * size.h) / 2;
-    return { x: Math.max(-maxX, Math.min(maxX, x)), y: Math.max(-maxY, Math.min(maxY, y)) };
-  };
-  const set = (k: number, x: number, y: number) => {
-    const c = clamp(x, y, k);
-    s.nowScale = k;
-    s.nowX = c.x;
-    s.nowY = c.y;
-    scale.setValue(k);
-    tx.setValue(c.x);
-    ty.setValue(c.y);
-  };
-  const settle = (k: number, x: number, y: number) => {
-    const c = k <= 1.01 ? { x: 0, y: 0 } : clamp(x, y, k);
-    const kk = k <= 1.01 ? 1 : k;
-    s.scale = kk;
-    s.x = c.x;
-    s.y = c.y;
-    s.nowScale = kk;
-    s.nowX = c.x;
-    s.nowY = c.y;
-    Animated.parallel([
-      Animated.spring(scale, { toValue: kk, useNativeDriver: true, bounciness: 0 }),
-      Animated.spring(tx, { toValue: c.x, useNativeDriver: true, bounciness: 0 }),
-      Animated.spring(ty, { toValue: c.y, useNativeDriver: true, bounciness: 0 }),
-    ]).start();
-    onZoom(kk > 1);
-  };
-
-  const distance = (e: GestureResponderEvent) => {
-    const [a, b] = e.nativeEvent.touches;
-    return a && b ? Math.hypot(a.pageX - b.pageX, a.pageY - b.pageY) : 0;
-  };
-
-  /** Starts a new stretch of the gesture from where things are now: a finger was added or lifted. */
-  const rebase = (e: GestureResponderEvent, g: PanResponderGestureState) => {
-    s.scale = s.nowScale;
-    s.x = s.nowX;
-    s.y = s.nowY;
-    s.pinch = distance(e);
-    s.ox = g.dx;
-    s.oy = g.dy;
-    s.fingers = e.nativeEvent.touches.length;
-  };
-
-  const responder = useRef(
-    PanResponder.create({
-      // Only take a touch for a pinch, to pan a zoomed photo, or as the second
-      // tap of a double tap. An ordinary drag at 1x is never claimed, so it
-      // reaches the list's native scrolling and swipes to the next photo.
-      onStartShouldSetPanResponder: (e: GestureResponderEvent) => {
-        if (e.nativeEvent.touches.length >= 2 || s.scale > 1) return true;
-        const now = Date.now();
-        if (now - s.lastTap < DOUBLE_TAP_MS) {
-          s.doubleTap = true;
-          return true;
-        }
-        s.lastTap = now;
-        return false;
-      },
-      onMoveShouldSetPanResponder: (e: GestureResponderEvent) => e.nativeEvent.touches.length >= 2 || s.scale > 1,
-      onPanResponderTerminationRequest: () => s.scale <= 1,
-      onPanResponderGrant: (e: GestureResponderEvent, g: PanResponderGestureState) => {
-        if (s.doubleTap) {
-          s.doubleTap = false;
-          s.lastTap = 0;
-          s.fingers = 0;
-          settle(s.scale > 1 ? 1 : 2.5, 0, 0);
-          return;
-        }
-        rebase(e, g);
-      },
-      onPanResponderMove: (e: GestureResponderEvent, g: PanResponderGestureState) => {
-        if (s.fingers === 0) return; // The double tap's own touch.
-        if (e.nativeEvent.touches.length !== s.fingers) rebase(e, g);
-        if (e.nativeEvent.touches.length >= 2) {
-          const d = distance(e);
-          const k = Math.max(1, Math.min(MAX_ZOOM, (s.scale * d) / (s.pinch || d)));
-          set(k, s.x, s.y);
-        } else if (s.scale > 1) {
-          set(s.scale, s.x + g.dx - s.ox, s.y + g.dy - s.oy);
-        }
-      },
-      onPanResponderRelease: () => settle(s.nowScale, s.nowX, s.nowY),
-      onPanResponderTerminate: () => settle(s.nowScale, s.nowX, s.nowY),
-    }),
-  ).current;
-
-  useEffect(() => {
-    register(() => settle(s.scale > 1 ? 1 : 2.5, 0, 0));
-    return () => register(null);
-  }, []); // eslint-disable-line react-hooks/exhaustive-deps
-
-  // Android's pager grabs a sideways move before a pinch can claim it, so
-  // stop it paging the moment a second finger lands, not once the pinch has
-  // begun. Lifting the fingers at 1x lets it page again (settle).
-  const twoFingers = (e: GestureResponderEvent) => {
-    if (e.nativeEvent.touches.length >= 2) onZoom(true);
-  };
-
-  return (
-    <View
-      style={styles.page}
-      onLayout={(e) => {
-        size.w = e.nativeEvent.layout.width;
-        size.h = e.nativeEvent.layout.height;
-      }}
-      onTouchStart={twoFingers}
-      onTouchMove={twoFingers}
-      onTouchEnd={(e) => {
-        if (e.nativeEvent.touches.length === 0 && s.nowScale <= 1.01) onZoom(false);
-      }}
-      {...responder.panHandlers}
-    >
-      <Animated.Image
-        source={{ uri }}
-        resizeMode="contain"
-        accessibilityLabel={label}
-        accessibilityHint="Pinch or double-tap to zoom"
-        style={[styles.image, { transform: [{ translateX: tx }, { translateY: ty }, { scale }] }]}
-      />
-    </View>
-  );
-}
+type Mode = 'none' | 'page' | 'pan' | 'pinch';
 
 const styles = StyleSheet.create({
   viewer: { flex: 1 },
-  count: { textAlign: 'center', fontSize: 14, fontWeight: '600', paddingVertical: space.s },
-  list: { flex: 1 },
-  page: { flex: 1, overflow: 'hidden' },
+  // Above a zoomed photo, wherever a platform lets it spill.
+  count: { textAlign: 'center', fontSize: 14, fontWeight: '600', paddingVertical: space.s, zIndex: 2 },
+  stage: { flex: 1, overflow: 'hidden', zIndex: 1 },
+  row: { flexDirection: 'row', flex: 1 },
+  page: { overflow: 'hidden' },
   image: { flex: 1, width: '100%' },
-  bar: { flexDirection: 'row', justifyContent: 'space-between', paddingHorizontal: space.l, paddingTop: space.l, backgroundColor: '#000' },
+  bar: { flexDirection: 'row', justifyContent: 'space-between', paddingHorizontal: space.l, paddingTop: space.l, backgroundColor: '#000', zIndex: 2, elevation: 2 },
   link: { color: '#fff', fontSize: 17, fontWeight: '600', padding: space.s },
 });
