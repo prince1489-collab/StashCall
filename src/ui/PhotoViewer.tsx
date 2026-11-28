@@ -95,7 +95,7 @@ function ZoomImage({ uri, label, onZoom }: { uri: string; label: string; onZoom:
   const tx = useRef(new Animated.Value(0)).current;
   const ty = useRef(new Animated.Value(0)).current;
   // Where things stood when the current gesture began.
-  const s = useRef({ scale: 1, x: 0, y: 0, pinch: 0, lastTap: 0, nowScale: 1, nowX: 0, nowY: 0 }).current;
+  const s = useRef({ scale: 1, x: 0, y: 0, pinch: 0, lastTap: 0, nowScale: 1, nowX: 0, nowY: 0, ox: 0, oy: 0, fingers: 0, doubleTap: false }).current;
 
   const clamp = (x: number, y: number, k: number) => {
     const maxX = ((k - 1) * size.w) / 2;
@@ -133,31 +133,53 @@ function ZoomImage({ uri, label, onZoom }: { uri: string; label: string; onZoom:
     return a && b ? Math.hypot(a.pageX - b.pageX, a.pageY - b.pageY) : 0;
   };
 
+  /** Starts a new stretch of the gesture from where things are now: a finger was added or lifted. */
+  const rebase = (e: GestureResponderEvent, g: PanResponderGestureState) => {
+    s.scale = s.nowScale;
+    s.x = s.nowX;
+    s.y = s.nowY;
+    s.pinch = distance(e);
+    s.ox = g.dx;
+    s.oy = g.dy;
+    s.fingers = e.nativeEvent.touches.length;
+  };
+
   const responder = useRef(
     PanResponder.create({
-      onStartShouldSetPanResponder: () => true,
-      // Take over for a pinch, or to pan a zoomed photo; otherwise let the
-      // swipe go to the list of photos.
+      // Only take a touch for a pinch, to pan a zoomed photo, or as the second
+      // tap of a double tap. An ordinary drag at 1x is never claimed, so it
+      // reaches the list's native scrolling and swipes to the next photo.
+      onStartShouldSetPanResponder: (e: GestureResponderEvent) => {
+        if (e.nativeEvent.touches.length >= 2 || s.scale > 1) return true;
+        const now = Date.now();
+        if (now - s.lastTap < DOUBLE_TAP_MS) {
+          s.doubleTap = true;
+          return true;
+        }
+        s.lastTap = now;
+        return false;
+      },
       onMoveShouldSetPanResponder: (e: GestureResponderEvent) => e.nativeEvent.touches.length >= 2 || s.scale > 1,
       onPanResponderTerminationRequest: () => s.scale <= 1,
-      onPanResponderGrant: (e: GestureResponderEvent) => {
-        s.pinch = distance(e);
-        const now = Date.now();
-        if (e.nativeEvent.touches.length === 1 && now - s.lastTap < DOUBLE_TAP_MS) {
+      onPanResponderGrant: (e: GestureResponderEvent, g: PanResponderGestureState) => {
+        if (s.doubleTap) {
+          s.doubleTap = false;
           s.lastTap = 0;
+          s.fingers = 0;
           settle(s.scale > 1 ? 1 : 2.5, 0, 0);
           return;
         }
-        s.lastTap = now;
+        rebase(e, g);
       },
       onPanResponderMove: (e: GestureResponderEvent, g: PanResponderGestureState) => {
+        if (s.fingers === 0) return; // The double tap's own touch.
+        if (e.nativeEvent.touches.length !== s.fingers) rebase(e, g);
         if (e.nativeEvent.touches.length >= 2) {
           const d = distance(e);
-          if (!s.pinch) s.pinch = d;
           const k = Math.max(1, Math.min(MAX_ZOOM, (s.scale * d) / (s.pinch || d)));
           set(k, s.x, s.y);
         } else if (s.scale > 1) {
-          set(s.scale, s.x + g.dx, s.y + g.dy);
+          set(s.scale, s.x + g.dx - s.ox, s.y + g.dy - s.oy);
         }
       },
       onPanResponderRelease: () => settle(s.nowScale, s.nowX, s.nowY),
