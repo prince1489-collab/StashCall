@@ -8,6 +8,8 @@ export interface BookingRef {
   pnr: string;
   /** Flight numbers on the same ticket, like ["6E2008", "6E7415"]. */
   flights: string[];
+  /** Whose booking it is, when known: a son and his dad on one flight can have their own PNRs. */
+  person?: string;
 }
 
 /** What check-in fills in, kept on this phone only. */
@@ -65,26 +67,33 @@ export function findBookingRefs(text: string | null | undefined, separator = '\n
 export function mergeRefs(had: BookingRef[] = [], read: BookingRef[]): BookingRef[] {
   const out = had.map((r) => ({ ...r, flights: [...r.flights] }));
   for (const r of read) {
-    // A flight now on another booking (rebooked) leaves the old one.
-    for (const o of out) if (o.pnr !== r.pnr) o.flights = o.flights.filter((f) => !r.flights.includes(f));
-    const same = out.find((o) => o.pnr === r.pnr);
+    // A flight now on another of this person's bookings (rebooked) leaves the
+    // old one. Someone else's booking on the same flight is theirs, and stays.
+    for (const o of out) if (o.pnr !== r.pnr && o.person === r.person) o.flights = o.flights.filter((f) => !r.flights.includes(f));
+    const same = out.find((o) => o.pnr === r.pnr && o.person === r.person);
     if (same) same.flights = [...new Set([...same.flights, ...r.flights])];
-    else out.push({ pnr: r.pnr, flights: [...r.flights] });
+    else out.push({ ...r, flights: [...r.flights] });
   }
   return out;
 }
 
-/** The PNR to check in these flights with: the booking they're on, or the trip's only booking. */
-export function pnrFor(refs: BookingRef[] | undefined, flightNumbers: string[]): string | undefined {
-  if (!refs || refs.length === 0) return undefined;
-  const on = refs.find((r) => r.flights.some((f) => flightNumbers.includes(f)));
-  if (on) return on.pnr;
+/**
+ * The PNR to check one person in with: their booking these flights are on,
+ * or the trip's only booking. Bookings of unknown owner count as theirs;
+ * their own come first.
+ */
+export function pnrFor(all: BookingRef[] | undefined, flightNumbers: string[], person?: string): string | undefined {
+  const refs = (all ?? []).filter((r) => !r.person || r.person === person);
+  if (refs.length === 0) return undefined;
+  const on = refs.filter((r) => r.flights.some((f) => flightNumbers.includes(f)));
+  const best = on.find((r) => r.person === person) ?? on[0];
+  if (best) return best.pnr;
   return refs.length === 1 && refs[0].flights.length === 0 ? refs[0].pnr : undefined;
 }
 
-/** Keeps a PNR typed on the check-in screen as the booking for these flights. */
-export function withTypedPnr(refs: BookingRef[] | undefined, pnr: string, flightNumbers: string[]): BookingRef[] {
-  return mergeRefs(refs, [{ pnr, flights: flightNumbers }]);
+/** Keeps a PNR typed on the check-in screen as this person's booking for these flights. */
+export function withTypedPnr(refs: BookingRef[] | undefined, pnr: string, flightNumbers: string[], person?: string): BookingRef[] {
+  return mergeRefs(refs, [{ pnr, flights: flightNumbers, ...(person && { person }) }]);
 }
 
 /**
@@ -163,9 +172,10 @@ export function fillScript(v: { pnr?: string; lastName?: string }): string {
 true;`;
 }
 
-/** Keeps booking references read for a trip, on this phone. */
-export function keepRefs<D extends { checkIn?: CheckInDetails }>(data: D, tripId: string, read: BookingRef[]): D {
+/** Keeps booking references read for a trip, on this phone, as `person`'s when known. */
+export function keepRefs<D extends { checkIn?: CheckInDetails }>(data: D, tripId: string, read: BookingRef[], person?: string): D {
   if (read.length === 0) return data;
   const refs = data.checkIn?.refs ?? {};
-  return { ...data, checkIn: { ...data.checkIn, refs: { ...refs, [tripId]: mergeRefs(refs[tripId], read) } } };
+  const theirs = person ? read.map((r) => ({ ...r, person })) : read;
+  return { ...data, checkIn: { ...data.checkIn, refs: { ...refs, [tripId]: mergeRefs(refs[tripId], theirs) } } };
 }

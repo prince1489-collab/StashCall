@@ -408,7 +408,7 @@ export default function EditTrip() {
     const out = hasFlight ? flight : undefined;
     const home = hasReturn ? returnFlight : undefined;
     await update((d) => {
-      let next = keepRefs(setPersonFlights(d, tripId, person.id, { flight: out, returnFlight: home }), tripId, findBookingRefs(readText));
+      let next = keepRefs(setPersonFlights(d, tripId, person.id, { flight: out, returnFlight: home }), tripId, findBookingRefs(readText), person.id);
       // Their own flights mean they're going.
       const t = next.trips.find((x) => x.id === tripId);
       if (t?.travellerIds && !t.travellerIds.includes(person.id))
@@ -458,7 +458,7 @@ export default function EditTrip() {
     await saveTrip(trip);
     // The PNRs on the tickets, so check-in can fill them in. On this phone only.
     const refs = findBookingRefs(readText);
-    if (refs.length > 0) await update((d) => keepRefs(d, trip.id, refs));
+    if (refs.length > 0) await update((d) => keepRefs(d, trip.id, refs, data.meId));
     // Ask at the moment it obviously matters: right after planning a trip.
     await askPermission();
     router.back();
