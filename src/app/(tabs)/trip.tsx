@@ -190,7 +190,7 @@ function TripDetail({ trip }: { trip: Trip }) {
           Share checklist
         </Text>
       </View>
-      <SharedWith />
+      <SharedWith trip={trip} />
       <FamilyStatus trip={trip} now={now} />
       {going.length > 1 ? (
         <View style={styles.plans}>
@@ -316,13 +316,20 @@ function route(f: NonNullable<Trip['flight']>): string {
   return stops.join(' → ');
 }
 
-/** Who else sees this trip, when family sharing is on. */
-function SharedWith() {
+/** Who else is going and gets this trip on their phone, when family sharing is on. */
+function SharedWith({ trip }: { trip: Trip }) {
   const { data } = useAppData();
   const sync = useSync();
   if (!sync.inviteCode) return null;
-  const others = data.owners.filter((p) => p.ownPhone && p.id !== data.meId).map((p) => p.name);
-  const who = others.length > 0 ? `Shared with ${others.join(' and ')}` : 'Shared, waiting for family to join';
+  const phones = data.owners.filter((p) => p.ownPhone && p.id !== data.meId);
+  const going = travellers(trip, phones).map((p) => p.name);
+  const who =
+    going.length > 0
+      ? `Shared with ${going.join(' and ')}`
+      : phones.length > 0
+        ? // Family phones still get it, folded under trips they're not on.
+          'Only you are going'
+        : 'Shared, waiting for family to join';
   const state = sync.status === 'synced' ? 'up to date' : sync.status === 'syncing' ? 'syncing' : sync.status === 'offline' ? 'offline for now' : '';
   return (
     <Text style={styles.shared} onPress={() => router.push('/household')} accessibilityRole="button">
