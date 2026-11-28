@@ -21,9 +21,25 @@ export interface CheckInDetails {
 }
 
 // "PNR: AB12CD", "Airline PNR AB12CD", "Booking Reference - AB12CD",
-// "Confirmation code AB12CD". The label can be on the line above.
+// "Reservation No.(PNR) : AB12CD", "Confirmation code AB12CD".
 const LABEL =
-  /\b(?:PNR|Booking\s*(?:Ref(?:erence)?|Code|ID)|Confirmation\s*(?:Code|Number|No\.?)|Reservation\s*(?:Code|Number|No\.?))(?:\s*(?:No\.?|Number|Code))?\s*[:#.\-]?\s*([A-Za-z0-9]{6})(?![A-Za-z0-9])/gi;
+  /\b(?:PNR|Booking\s*(?:Ref(?:erence)?|Code|ID)|Confirmation\s*(?:Code|Number|No\.?)|Reservation\s*(?:Code|Number|No\.?))(?:\s*(?:No\.?|Number|Code))?/gi;
+/** How far after a label its value can be: a table read from a screenshot puts other cells between. */
+const WINDOW = 200;
+
+/** The PNR a label at `end` goes with: the very next word, or else the first booking-code-looking word soon after. */
+function valueAfter(text: string, end: number): string | undefined {
+  const after = text.slice(end, end + WINDOW);
+  const next = /^[\s:#.\-()[\]]*([A-Za-z0-9]+)/.exec(after)?.[1];
+  if (next && isPnr(next)) return next;
+  // Further on, only a mix of capitals and digits that isn't a flight
+  // number, so a nearby "Status" or "6E2008" isn't taken for it.
+  for (const m of after.matchAll(/(?<![A-Za-z0-9])([A-Z0-9]{6})(?![A-Za-z0-9])/g)) {
+    const w = m[1];
+    if (isPnr(w) && /\d/.test(w) && !isFlightNumber(w)) return w;
+  }
+  return undefined;
+}
 
 const FLIGHT = /\b([A-Z0-9]{2})\s?-?(\d{2,4})\b/g;
 
@@ -53,8 +69,8 @@ export function findBookingRefs(text: string | null | undefined, separator = '\n
   for (const part of text.split(separator)) {
     const flights = flightNumbersIn(part);
     for (const m of part.matchAll(LABEL)) {
-      const pnr = m[1];
-      if (!isPnr(pnr)) continue;
+      const pnr = valueAfter(part, m.index + m[0].length);
+      if (!pnr) continue;
       const had = out.find((r) => r.pnr === pnr);
       if (!had) out.push({ pnr, flights: [...flights] });
       else for (const f of flights) if (!had.flights.includes(f)) had.flights.push(f);
@@ -179,4 +195,21 @@ export function keepRefs<D extends { checkIn?: CheckInDetails }>(data: D, tripId
   const refs = data.checkIn?.refs ?? {};
   const theirs = person ? read.map((r) => ({ ...r, person })) : read;
   return { ...data, checkIn: { ...data.checkIn, refs: { ...refs, [tripId]: mergeRefs(refs[tripId], theirs) } } };
+}
+
+/**
+ * This person's surname as a ticket prints it: the word after their first
+ * name, as in "Ms. Vidhi Ruparel" for Vidhi. Undefined when their name
+ * isn't on it, so nobody else's surname is taken.
+ */
+export function surnameOn(text: string | null | undefined, firstName: string | undefined): string | undefined {
+  const first = firstName?.trim().split(/\s+/)[0];
+  if (!text || !first || first.length < 2) return undefined;
+  const esc = first.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+  const m = new RegExp(`(?<![A-Za-z])${esc}\\s+([A-Za-z][A-Za-z'-]{1,})(?![A-Za-z])`, 'i').exec(text);
+  if (!m) return undefined;
+  const last = m[1];
+  // Labels that can follow a name in a table.
+  if (/^(?:mr|ms|mrs|adult|child|infant|male|female|economy|seat|gate|from|to)$/i.test(last)) return undefined;
+  return last[0].toUpperCase() + last.slice(1).toLowerCase();
 }

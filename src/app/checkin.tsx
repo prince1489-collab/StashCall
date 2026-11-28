@@ -6,7 +6,7 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { WebView as RNWebView } from 'react-native-webview';
 import type { WebViewMessageEvent, WebViewProps } from 'react-native-webview';
 
-import { fillScript, findBookingRefs, keepRefs, pnrFor, withTypedPnr } from '../domain/bookingRef';
+import { fillScript, findBookingRefs, keepRefs, pnrFor, surnameOn, withTypedPnr } from '../domain/bookingRef';
 import type { BookingRef } from '../domain/bookingRef';
 import { checkIns } from '../domain/checkin';
 import { namedOn } from '../domain/journeys';
@@ -54,30 +54,35 @@ export default function CheckInScreen() {
   const web = useRef<WebHandle>(null);
   const started = useRef(false);
 
-  // No PNR kept yet: look for one on the trip's ticket screenshots, read on the phone.
+  // No PNR or surname kept yet: look on the trip's tickets and this phone's
+  // boarding passes, read on the phone.
   useEffect(() => {
-    if (!trip || !c || known || started.current) return;
+    if (!trip || !c || (known && data.checkIn?.lastName) || started.current) return;
     started.current = true;
-    const shots = (trip.tickets ?? []).filter((t) => t.uri);
+    const shots = [...(trip.tickets ?? []), ...(trip.passes ?? [])].filter((t) => t.uri);
     if (shots.length === 0) return;
     setReading(true);
     (async () => {
       const found: BookingRef[] = [];
       const people = travellers(trip, data.owners);
+      const me = data.owners.find((o) => o.id === data.meId);
+      let surname: string | undefined;
       for (const t of shots) {
         const text = (await readTicket(t.uri)).text;
         // A ticket naming one traveller is theirs; one naming nobody, anyone's.
         const named = namedOn(text, people);
         const person = named.length === 1 ? named[0].id : undefined;
         found.push(...findBookingRefs(text).map((r) => (person ? { ...r, person } : r)));
+        surname ??= surnameOn(text, me?.name);
       }
       if (found.length > 0) await update((d) => keepRefs(d, trip.id, found));
       const p = pnrFor(found, c.flightNumbers, data.meId);
       if (p) setPnr((had) => had || p);
+      if (surname) setLastName((had) => had || surname!);
     })()
       .catch(() => {})
       .finally(() => setReading(false));
-  }, [trip, c, known, update, data.owners, data.meId]);
+  }, [trip, c, known, update, data.owners, data.meId, data.checkIn?.lastName]);
 
   if (!trip || !c) {
     return (
@@ -200,7 +205,7 @@ export default function CheckInScreen() {
           accessibilityLabel="PNR or booking reference"
         />
       </Section>
-      {reading ? <Text style={styles.help}>Looking for the PNR on your tickets…</Text> : null}
+      {reading ? <Text style={styles.help}>Looking for your PNR and surname on your tickets…</Text> : null}
       <Section title="Surname, as on the booking">
         <TextInput
           style={styles.input}

@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest';
 
 import type { CheckInDetails } from '../bookingRef';
-import { findBookingRefs, isPnr, keepRefs, mergeRefs, pnrFor, withTypedPnr } from '../bookingRef';
+import { findBookingRefs, isPnr, keepRefs, mergeRefs, pnrFor, surnameOn, withTypedPnr } from '../bookingRef';
 
 // Made-up bookings, laid out like airline and travel-agent e-tickets.
 const indigo = `IndiGo
@@ -109,5 +109,31 @@ describe('bookings per traveller', () => {
 describe('a phone with no person chosen', () => {
   it('can use anyone’s booking', () => {
     expect(pnrFor([{ pnr: 'MAH111', flights: ['6E7415'], person: 'me' }], ['6E7415'], undefined)).toBe('MAH111');
+  });
+});
+
+describe('tickets read from screenshots', () => {
+  it('reads "Reservation No.(PNR)" with its value a few cells later', () => {
+    const t = `Passenger Ms. Asha Verma Cost Borne By NA
+Phone/Mobile 9800000000 Reservation No.(PNR) BB12XY
+Ticket No 106400000`;
+    expect(findBookingRefs(t)).toEqual([{ pnr: 'BB12XY', flights: [] }]);
+    expect(findBookingRefs('Reservation No.(PNR)\nCost Borne By\nNA\nBB12XY')).toEqual([{ pnr: 'BB12XY', flights: [] }]);
+  });
+
+  it('does not take a flight number near the label for the PNR', () => {
+    expect(findBookingRefs('PNR Status 6E2008 on time')).toEqual([]);
+  });
+
+  it('reads a boarding pass PNR', () => {
+    expect(findBookingRefs('Seq 12 PNR\nBB12XY\nFlight 6E 6083')[0].pnr).toBe('BB12XY');
+  });
+});
+
+describe('surnameOn', () => {
+  it('reads the word after this person’s first name', () => {
+    expect(surnameOn('Passenger Ms. Asha VERMA Cost', 'Asha')).toBe('Verma');
+    expect(surnameOn('Passenger Mr. Ravi Kumar', 'Asha')).toBeUndefined();
+    expect(surnameOn('Asha', 'Asha')).toBeUndefined();
   });
 });
