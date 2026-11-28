@@ -7,7 +7,7 @@ import type { Ticket } from '../domain/types';
 import { space } from './theme';
 
 const MAX_ZOOM = 5;
-const DOUBLE_TAP_MS = 280;
+const DOUBLE_TAP_MS = 350;
 
 /**
  * Full-screen photos: swipe left and right through them, pinch or double-tap
@@ -36,6 +36,8 @@ export function PhotoViewer({
   const [index, setIndex] = useState(start);
   const [zoomed, setZoomed] = useState(false);
   const [height, setHeight] = useState(0);
+  // Each photo's zoom toggle, for the Zoom button.
+  const toggles = useRef(new Map<string, () => void>()).current;
   useEffect(() => {
     setIndex(start);
     setZoomed(false);
@@ -66,7 +68,7 @@ export function PhotoViewer({
           onMomentumScrollEnd={(e) => setIndex(Math.round(e.nativeEvent.contentOffset.x / width))}
           renderItem={({ item }) => (
             <View style={{ width, height }}>
-              <ZoomImage uri={item.uri} label={label} onZoom={setZoomed} />
+              <ZoomImage uri={item.uri} label={label} onZoom={setZoomed} register={(t) => (t ? toggles.set(item.id, t) : toggles.delete(item.id))} />
             </View>
           )}
         />
@@ -78,6 +80,11 @@ export function PhotoViewer({
           ) : (
             <View />
           )}
+          {current ? (
+            <Text style={styles.link} onPress={() => toggles.get(current.id)?.()} accessibilityRole="button">
+              {zoomed ? 'Zoom out' : 'Zoom in'}
+            </Text>
+          ) : null}
           <Text style={styles.link} onPress={onClose} accessibilityRole="button">
             Close
           </Text>
@@ -88,7 +95,18 @@ export function PhotoViewer({
 }
 
 /** One photo that zooms with two fingers or a double tap, and pans while zoomed. */
-function ZoomImage({ uri, label, onZoom }: { uri: string; label: string; onZoom: (zoomed: boolean) => void }) {
+function ZoomImage({
+  uri,
+  label,
+  onZoom,
+  register,
+}: {
+  uri: string;
+  label: string;
+  onZoom: (zoomed: boolean) => void;
+  /** Hands the viewer a way to zoom this photo in or out, for its Zoom button. */
+  register: (toggle: (() => void) | null) => void;
+}) {
   // A ref, not state: the gesture handlers are made once and read it later.
   const size = useRef({ w: 1, h: 1 }).current;
   const scale = useRef(new Animated.Value(1)).current;
@@ -187,12 +205,29 @@ function ZoomImage({ uri, label, onZoom }: { uri: string; label: string; onZoom:
     }),
   ).current;
 
+  useEffect(() => {
+    register(() => settle(s.scale > 1 ? 1 : 2.5, 0, 0));
+    return () => register(null);
+  }, []); // eslint-disable-line react-hooks/exhaustive-deps
+
+  // Android's pager grabs a sideways move before a pinch can claim it, so
+  // stop it paging the moment a second finger lands, not once the pinch has
+  // begun. Lifting the fingers at 1x lets it page again (settle).
+  const twoFingers = (e: GestureResponderEvent) => {
+    if (e.nativeEvent.touches.length >= 2) onZoom(true);
+  };
+
   return (
     <View
       style={styles.page}
       onLayout={(e) => {
         size.w = e.nativeEvent.layout.width;
         size.h = e.nativeEvent.layout.height;
+      }}
+      onTouchStart={twoFingers}
+      onTouchMove={twoFingers}
+      onTouchEnd={(e) => {
+        if (e.nativeEvent.touches.length === 0 && s.nowScale <= 1.01) onZoom(false);
       }}
       {...responder.panHandlers}
     >
