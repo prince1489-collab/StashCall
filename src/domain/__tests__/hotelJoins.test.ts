@@ -38,7 +38,7 @@ describe('hotel booking joins its trip', () => {
 
   it('sets the checkout in the trip’s zone, keeping a hotel name', () => {
     const t = withHotelCheckout({ ...kanpur, checkout: { checkout: '2026-12-01T10:00', timeZone: 'Asia/Kolkata', sweepMinutesBefore: 30, hotelName: 'Landmark' } }, '2026-12-01T12:00');
-    expect(t.checkout).toEqual({ checkout: '2026-12-01T12:00', timeZone: 'Asia/Kolkata', sweepMinutesBefore: 30, hotelName: 'Landmark', timeZoneConfirmed: true });
+    expect(t.checkout).toEqual({ checkout: '2026-12-01T12:00', timeZone: 'Asia/Kolkata', sweepMinutesBefore: 30, hotelName: 'Landmark', timeZoneConfirmed: false });
   });
 });
 
@@ -51,5 +51,27 @@ describe('reading a hotel booking', () => {
 
   it('reads the later date when check-in and check-out head a table', () => {
     expect(parseTicketText(['Hotel Landmark, Kanpur', 'Check-in Check-out', '30 Nov 2026 01 Dec 2026'], new Date('2026-11-28')).checkout?.slice(0, 10)).toBe('2026-12-01');
+  });
+});
+
+describe('hotel zone and whose trip', () => {
+  const london: Trip = {
+    ...trip('london', '2027-02-19T02:00'),
+    flight: { ...leg('2027-02-19T02:00'), international: true, airport: 'BOM', destination: 'LHR' },
+  };
+
+  it('puts a London checkout in London time', () => {
+    expect(withHotelCheckout(london, '2027-02-21T11:00').checkout).toMatchObject({ timeZone: 'Europe/London', timeZoneConfirmed: true });
+  });
+
+  it('leaves a guessed zone unconfirmed abroad', () => {
+    const noDest: Trip = { ...london, flight: { ...london.flight!, destination: undefined } };
+    expect(withHotelCheckout(noDest, '2027-02-21T11:00').checkout?.timeZoneConfirmed).toBe(false);
+  });
+
+  it('skips trips this person isn’t going on', () => {
+    const dads = { ...trip('dads', '2026-11-30T11:40', '2026-12-01T20:45'), travellerIds: ['dad'] };
+    expect(hotelTripFor([dads], { checkout: '2026-12-01T12:00' }, 'me')).toBeUndefined();
+    expect(hotelTripFor([dads], { checkout: '2026-12-01T12:00' }, 'dad')?.id).toBe('dads');
   });
 });
