@@ -9,7 +9,8 @@ import type { WebViewMessageEvent, WebViewProps } from 'react-native-webview';
 import { fillScript, findBookingRefs, keepRefs, pnrFor, withTypedPnr } from '../domain/bookingRef';
 import type { BookingRef } from '../domain/bookingRef';
 import { checkIns } from '../domain/checkin';
-import { tripFor } from '../domain/people';
+import { namedOn } from '../domain/journeys';
+import { travellers, tripFor } from '../domain/people';
 import { stepDone, stepFlight, toggleStep } from '../domain/stepsDone';
 import { addPasses } from '../domain/tickets';
 import { buildTimeline } from '../domain/timeline';
@@ -42,7 +43,7 @@ export default function CheckInScreen() {
   const mine = trip && tripFor(trip, data.meId);
   const c = useMemo(() => (mine ? checkIns(mine).find((x) => x.flightNumbers.includes(flight ?? '')) : undefined), [mine, flight]);
   const refs = tripId ? data.checkIn?.refs?.[tripId] : undefined;
-  const known = c ? pnrFor(refs, c.flightNumbers) : undefined;
+  const known = c ? pnrFor(refs, c.flightNumbers, data.meId) : undefined;
 
   const [pnr, setPnr] = useState(known ?? '');
   const [lastName, setLastName] = useState(data.checkIn?.lastName ?? '');
@@ -62,14 +63,21 @@ export default function CheckInScreen() {
     setReading(true);
     (async () => {
       const found: BookingRef[] = [];
-      for (const t of shots) found.push(...findBookingRefs((await readTicket(t.uri)).text));
+      const people = travellers(trip, data.owners);
+      for (const t of shots) {
+        const text = (await readTicket(t.uri)).text;
+        // A ticket naming one traveller is theirs; one naming nobody, anyone's.
+        const named = namedOn(text, people);
+        const person = named.length === 1 ? named[0].id : undefined;
+        found.push(...findBookingRefs(text).map((r) => (person ? { ...r, person } : r)));
+      }
       if (found.length > 0) await update((d) => keepRefs(d, trip.id, found));
-      const p = pnrFor(found, c.flightNumbers);
+      const p = pnrFor(found, c.flightNumbers, data.meId);
       if (p) setPnr((had) => had || p);
     })()
       .catch(() => {})
       .finally(() => setReading(false));
-  }, [trip, c, known, update]);
+  }, [trip, c, known, update, data.owners, data.meId]);
 
   if (!trip || !c) {
     return (
@@ -90,7 +98,7 @@ export default function CheckInScreen() {
       checkIn: {
         ...d.checkIn,
         ...(cleanLast && { lastName: cleanLast }),
-        refs: cleanPnr ? { ...d.checkIn?.refs, [trip.id]: withTypedPnr(d.checkIn?.refs?.[trip.id], cleanPnr, c.flightNumbers) } : d.checkIn?.refs,
+        refs: cleanPnr ? { ...d.checkIn?.refs, [trip.id]: withTypedPnr(d.checkIn?.refs?.[trip.id], cleanPnr, c.flightNumbers, d.meId) } : d.checkIn?.refs,
       },
     }));
     setFilled([]);
@@ -136,6 +144,9 @@ export default function CheckInScreen() {
               : filled.length > 0
                 ? `Filled in your ${filled.includes('pnr') ? 'PNR' : 'surname'}. Your PNR is ${cleanPnr || 'not saved'}, surname ${cleanLast || 'not saved'}.`
                 : `When ${c.airline} asks, StashCall fills in PNR ${cleanPnr || '(none)'} and surname ${cleanLast || '(none)'}. Open their check-in if it isn't showing.`}
+          </Text>
+          <Text style={styles.bannerLink} onPress={() => setOpen(false)} accessibilityRole="button">
+            Change PNR or surname
           </Text>
         </View>
         <WebView
@@ -218,6 +229,7 @@ const styles = StyleSheet.create({
   webScreen: { flex: 1, backgroundColor: colors.bg },
   banner: { backgroundColor: colors.accentSoft, paddingHorizontal: space.l, paddingVertical: space.m },
   bannerText: { fontSize: 14, color: colors.text, lineHeight: 19 },
+  bannerLink: { fontSize: 14, color: colors.accent, fontWeight: '600', marginTop: space.xs },
   web: { flex: 1 },
   loading: { position: 'absolute', top: space.xl, alignSelf: 'center' },
   bar: { flexDirection: 'row', justifyContent: 'space-between', paddingHorizontal: space.l, paddingTop: space.m, backgroundColor: colors.card },

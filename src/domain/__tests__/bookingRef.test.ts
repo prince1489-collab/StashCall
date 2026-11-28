@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'vitest';
 
+import type { CheckInDetails } from '../bookingRef';
 import { findBookingRefs, isPnr, keepRefs, mergeRefs, pnrFor, withTypedPnr } from '../bookingRef';
 
 // Made-up bookings, laid out like airline and travel-agent e-tickets.
@@ -73,5 +74,34 @@ describe('pnrFor and keeping refs', () => {
     const d = { checkIn: { lastName: 'Singh' } };
     expect(keepRefs(d, 't1', [])).toBe(d);
     expect(keepRefs(d, 't1', refs).checkIn).toEqual({ lastName: 'Singh', refs: { t1: refs } });
+  });
+});
+
+describe('bookings per traveller', () => {
+  it('keeps two people’s own PNRs for the same flight', () => {
+    const mine = keepRefs<{ checkIn?: CheckInDetails }>({}, 't1', [{ pnr: 'MAH111', flights: ['6E7415'] }], 'me');
+    const both = keepRefs(mine, 't1', [{ pnr: 'DAD222', flights: ['6E7415'] }], 'dad');
+    const refs = both.checkIn!.refs!.t1;
+    expect(pnrFor(refs, ['6E7415'], 'me')).toBe('MAH111');
+    expect(pnrFor(refs, ['6E7415'], 'dad')).toBe('DAD222');
+  });
+
+  it('prefers a person’s own booking over one of unknown owner', () => {
+    const refs = [
+      { pnr: 'ANY333', flights: ['6E7415'] },
+      { pnr: 'MAH111', flights: ['6E7415'], person: 'me' },
+    ];
+    expect(pnrFor(refs, ['6E7415'], 'me')).toBe('MAH111');
+    expect(pnrFor(refs, ['6E7415'], 'dad')).toBe('ANY333');
+  });
+
+  it('moves a flight only between the same person’s bookings when one is typed', () => {
+    const refs = [
+      { pnr: 'MAH111', flights: ['6E7415'], person: 'me' },
+      { pnr: 'DAD222', flights: ['6E7415'], person: 'dad' },
+    ];
+    const next = withTypedPnr(refs, 'NEW999', ['6E7415'], 'me');
+    expect(pnrFor(next, ['6E7415'], 'me')).toBe('NEW999');
+    expect(pnrFor(next, ['6E7415'], 'dad')).toBe('DAD222');
   });
 });

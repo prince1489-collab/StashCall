@@ -125,11 +125,11 @@ export function ShareInbox() {
           return;
         }
         // They match this trip as it is. Keep their PNRs for check-in.
-        await update((d) => keepRefs(d, currentTrip.id, findBookingRefs(text)));
+        await update((d) => keepRefs(d, currentTrip.id, findBookingRefs(text), d.meId));
         Alert.alert('Already in your trip', `That booking matches ${currentTrip.name}, so nothing needed changing.`);
         return;
       }
-      await update((d) => keepRefs(addTickets(d, currentTrip.id, kept), currentTrip.id, findBookingRefs(text)));
+      await update((d) => keepRefs(addTickets(d, currentTrip.id, kept), currentTrip.id, findBookingRefs(text), d.meId));
       viewTrip(currentTrip.id);
       router.navigate('/trip');
       Alert.alert(
