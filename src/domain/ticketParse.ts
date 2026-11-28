@@ -318,7 +318,10 @@ function findCheckout(text: string, today: Date): LocalDateTime | undefined {
   const m = /check[\s-]?out/i.exec(text);
   if (!m) return undefined;
   const after = text.slice(m.index, m.index + 160);
-  const date = findDates(after)[0];
+  const dates = findDates(after);
+  // A table with "Check-in  Check-out" headings, then both dates: the later one.
+  const table = /check[\s-]?in\W{0,30}$/i.test(text.slice(Math.max(0, m.index - 40), m.index)) && dates.length >= 2;
+  const date = table ? dates[1] : dates[0];
   if (!date) return undefined;
   // "Check-out: Sun 21 Feb 2027, until 11:00"; most hotels say 11:00 or 12:00.
   const time = findTimes(after.slice(date.end)).find((t) => t.index < 60)?.value ?? '11:00';
