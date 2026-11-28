@@ -148,7 +148,11 @@ export function PhotoViewer({
     z.ox = g.dx;
     z.oy = g.dy;
     z.fingers = f.n;
-    if (f.n >= 2) z.mode = 'pinch';
+    if (f.n >= 2) {
+      // A swipe that turns into a pinch: put the page back in place first.
+      if (z.mode === 'page') Animated.spring(pageX, { toValue: -live.index * live.w, useNativeDriver: true, bounciness: 0, speed: 20 }).start();
+      z.mode = 'pinch';
+    }
     else if (z.mode !== 'page') z.mode = z.k > 1 ? 'pan' : 'page';
   };
 
