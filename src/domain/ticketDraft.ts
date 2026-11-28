@@ -2,7 +2,9 @@ import { DEFAULTS } from './defaults';
 import { isFlightNumber, suggestTripName, type FlightDetails, type TicketDetails } from './ticketParse';
 import { zonedToInstant } from './time';
 import { defaultFlight } from './timeline';
-import type { Connection, FlightLeg, HotelCheckout, Trip } from './types';
+import { AIRPORTS } from './airports';
+import { isGoing, tripFor } from './people';
+import type { Connection, FlightLeg, HotelCheckout, LocalDateTime, Trip } from './types';
 
 export interface TripDraft {
   name: string;
@@ -187,5 +189,66 @@ export function joinLegs(had: FlightLeg | null | undefined, read: FlightLeg): Fl
     // airport-to-hotel time stays.
     lands: Math.max(...departures(second)) >= Math.max(...departures(first)) ? (second.lands ?? (same ? had.lands : undefined)) : first.lands,
     onwardMinutes: had.onwardMinutes ?? read.onwardMinutes,
+  };
+}
+
+/**
+ * The trip a hotel booking belongs to: one of `trips` (as `meId` travels
+ * it) whose stay its checkout falls in, from the flight out to a day after
+ * the flight home. The soonest such trip, or undefined.
+ */
+export function hotelTripFor(trips: Trip[], d: TicketDetails, meId?: string): Trip | undefined {
+  if (!d.checkout || d.departure) return undefined;
+  let best: { trip: Trip; start: number } | undefined;
+  for (const trip of trips) {
+    // Only this person's own trips: another member's booking isn't theirs to change.
+    if (!isGoing(trip, meId)) continue;
+    const t = tripFor(trip, meId);
+    if (!t.flight?.departure) continue;
+    const start = zonedToInstant(t.flight.departure, t.flight.timeZone).getTime();
+    const zone = stayZone(t)?.zone ?? t.flight.timeZone;
+    const out = zonedToInstant(d.checkout, zone).getTime();
+    const end = t.returnFlight?.departure
+      ? zonedToInstant(t.returnFlight.departure, t.returnFlight.timeZone).getTime() + DAY_MS
+      : start + 30 * DAY_MS;
+    if (out < start || out > end) continue;
+    if (!best || start < best.start) best = { trip, start };
+  }
+  return best?.trip;
+}
+
+const DAY_MS = 24 * 3600 * 1000;
+
+/**
+ * Where a trip stays, as a time zone: the hotel's own if set, else where
+ * the flight home leaves from, else where the flight out lands. `sure` is
+ * false only when none of those is known.
+ */
+function stayZone(t: Trip): { zone: string; sure: boolean } | undefined {
+  if (t.checkout?.timeZone) return { zone: t.checkout.timeZone, sure: !!t.checkout.timeZoneConfirmed };
+  if (t.returnFlight?.timeZone) return { zone: t.returnFlight.timeZone, sure: !!t.returnFlight.timeZoneConfirmed || !t.flight?.international };
+  const f = t.flight;
+  const last = f?.connections?.length ? f.connections[f.connections.length - 1].destination : f?.destination;
+  const landed = last ? AIRPORTS[last]?.timeZone : undefined;
+  if (landed) return { zone: landed, sure: true };
+  return f ? { zone: f.timeZone, sure: !f.international } : undefined;
+}
+
+/**
+ * The trip with a hotel booking's checkout, in the zone of where it's
+ * staying. A zone that's only a guess is left unconfirmed, so the trip
+ * form asks.
+ */
+export function withHotelCheckout(trip: Trip, checkout: LocalDateTime, meId?: string): Trip {
+  const at = stayZone(tripFor(trip, meId)) ?? { zone: 'UTC', sure: false };
+  return {
+    ...trip,
+    checkout: {
+      ...trip.checkout,
+      checkout,
+      timeZone: at.zone,
+      sweepMinutesBefore: trip.checkout?.sweepMinutesBefore ?? DEFAULTS.sweepMinutesBefore,
+      timeZoneConfirmed: at.sure,
+    },
   };
 }

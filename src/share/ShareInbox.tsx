@@ -5,7 +5,8 @@ import { Alert } from 'react-native';
 
 import { hasTripDetails, type TicketDetails } from '../domain/ticketParse';
 import { findBookingRefs, keepRefs } from '../domain/bookingRef';
-import { isReturnOf, joinsTrip } from '../domain/ticketDraft';
+import { hotelTripFor, isReturnOf, joinsTrip, withHotelCheckout } from '../domain/ticketDraft';
+import { formatLocalDate } from '../ui/Form';
 import { addTickets } from '../domain/tickets';
 import { buildTimeline } from '../domain/timeline';
 import type { Ticket, Trip } from '../domain/types';
@@ -84,6 +85,29 @@ export function ShareInbox() {
       const tickets = [...kept, ...pages];
       const detailsParam = JSON.stringify(all.length > 1 ? all : details);
 
+      // A hotel booking for a trip already planned: its checkout and pages go
+      // with that trip, rather than starting a new one.
+      const hotelOnly = all.length > 0 && all.every((d) => d.checkout && !d.departure);
+      const hotelTrip = hotelOnly ? hotelTripFor(data.trips, details, data.meId) : undefined;
+      if (hotelTrip) {
+        const checkout = details.checkout!;
+        const had = hotelTrip.checkout?.checkout;
+        await update((d) => {
+          const trips = d.trips.map((t) => (t.id === hotelTrip.id ? withHotelCheckout(t, checkout, d.meId) : t));
+          return keepRefs(addTickets({ ...d, trips }, hotelTrip.id, tickets), hotelTrip.id, findBookingRefs(text), d.meId);
+        });
+        viewTrip(hotelTrip.id);
+        router.navigate('/trip');
+        const when = `${formatLocalDate(checkout)}, ${checkout.slice(11)}`;
+        Alert.alert(
+          'Hotel booking added',
+          had && had !== checkout
+            ? `Kept with ${hotelTrip.name}. Checkout moved from ${formatLocalDate(had)}, ${had.slice(11)} to ${when}. Change it under Edit trip.`
+            : `Kept with ${hotelTrip.name}, with checkout ${when}. Your room check and checkout reminders now follow it.`,
+        );
+        return;
+      }
+
       // The flight home for the current trip, on its own or in the whole
       // round-trip booking: add it to that trip.
       const homeOnly = !details.returnFlight && !details.checkout && !!currentTrip?.flight && isReturnOf(currentTrip.flight, details);
@@ -143,7 +167,7 @@ export function ShareInbox() {
         `Kept with ${currentTrip.name}. It's on the Trip tab, and on Today too.`,
       );
     })();
-  }, [ready, hasShareIntent, shareIntent, resetShareIntent, currentTrip, update, data.owners.length]);
+  }, [ready, hasShareIntent, shareIntent, resetShareIntent, currentTrip, update, data.owners.length, data.trips, data.meId]);
 
   return null;
 }
