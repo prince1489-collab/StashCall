@@ -137,3 +137,11 @@ describe('surnameOn', () => {
     expect(surnameOn('Asha', 'Asha')).toBeUndefined();
   });
 });
+
+describe('surnameOn on boarding passes', () => {
+  it('reads surname-first names and never the next block', () => {
+    expect(surnameOn('VERMA/ASHA\n\nBOARDING PASS', 'Asha')).toBe('Verma');
+    expect(surnameOn('ASHA\nBOARDING PASS', 'Asha')).toBeUndefined();
+    expect(surnameOn('Name ASHA\nFlight 6E 6083', 'Asha')).toBeUndefined();
+  });
+});
