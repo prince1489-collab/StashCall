@@ -1,10 +1,10 @@
 import { useState } from 'react';
-import { Alert, Image, Modal, Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
-import { useSafeAreaInsets } from 'react-native-safe-area-context';
+import { Alert, Image, Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
 
 import type { Ticket } from '../domain/types';
 import { deletePhoto, takeDocPhoto } from '../storage/photos';
 import { newId } from '../storage/store';
+import { PhotoViewer } from './PhotoViewer';
 import { colors, space } from './theme';
 
 /**
@@ -18,7 +18,6 @@ export function DocPhotos(props: {
   onRemove: (doc: Ticket) => void;
 }) {
   const [open, setOpen] = useState<Ticket | null>(null);
-  const insets = useSafeAreaInsets();
 
   const keep = async (source: 'camera' | 'library') => {
     const uri = await takeDocPhoto(source);
@@ -57,19 +56,7 @@ export function DocPhotos(props: {
         </Pressable>
       </ScrollView>
 
-      <Modal visible={!!open} animationType="fade" onRequestClose={() => setOpen(null)}>
-        <View style={[styles.viewer, { paddingTop: insets.top, paddingBottom: insets.bottom }]}>
-          {open ? <Image source={{ uri: open.uri }} style={styles.full} resizeMode="contain" /> : null}
-          <View style={styles.viewerBar}>
-            <Text style={[styles.viewerLink, { color: '#ff8a80' }]} onPress={() => open && remove(open)}>
-              Remove
-            </Text>
-            <Text style={styles.viewerLink} onPress={() => setOpen(null)}>
-              Close
-            </Text>
-          </View>
-        </View>
-      </Modal>
+      <PhotoViewer photos={props.photos} openId={open?.id ?? null} onClose={() => setOpen(null)} onRemove={remove} label={props.label} />
     </View>
   );
 }
@@ -89,8 +76,4 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
   },
   addText: { color: colors.accent, fontWeight: '600', fontSize: 14 },
-  viewer: { flex: 1, backgroundColor: '#000' },
-  full: { flex: 1 },
-  viewerBar: { flexDirection: 'row', justifyContent: 'space-between', padding: space.l },
-  viewerLink: { color: '#fff', fontSize: 17, fontWeight: '600', padding: space.s },
 });

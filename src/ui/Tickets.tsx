@@ -1,12 +1,12 @@
 import { useState } from 'react';
-import { Alert, Image, Modal, Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
-import { useSafeAreaInsets } from 'react-native-safe-area-context';
+import { Alert, Image, Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
 
 import { addTickets, removeTicket } from '../domain/tickets';
 import type { Ticket, Trip } from '../domain/types';
 import { useAppData } from '../state/AppData';
 import { deletePhoto, pickTicket } from '../storage/photos';
 import { newId } from '../storage/store';
+import { PhotoViewer } from './PhotoViewer';
 import { colors, fonts, space } from './theme';
 
 /**
@@ -16,7 +16,6 @@ import { colors, fonts, space } from './theme';
 export function Tickets({ trip, compact = false }: { trip: Trip; compact?: boolean }) {
   const { update } = useAppData();
   const [open, setOpen] = useState<Ticket | null>(null);
-  const insets = useSafeAreaInsets();
   const tickets = trip.tickets ?? [];
   if (compact && tickets.length === 0) return null;
 
@@ -72,19 +71,13 @@ export function Tickets({ trip, compact = false }: { trip: Trip; compact?: boole
         </ScrollView>
       )}
 
-      <Modal visible={!!open} animationType="fade" onRequestClose={() => setOpen(null)}>
-        <View style={[styles.viewer, { paddingTop: insets.top, paddingBottom: insets.bottom }]}>
-          {open ? <Image source={{ uri: open.uri }} style={styles.full} resizeMode="contain" /> : null}
-          <View style={styles.viewerBar}>
-            <Text style={[styles.viewerLink, { color: '#ff8a80' }]} onPress={() => open && remove(open)}>
-              Remove
-            </Text>
-            <Text style={styles.viewerLink} onPress={() => setOpen(null)}>
-              Close
-            </Text>
-          </View>
-        </View>
-      </Modal>
+      <PhotoViewer
+        photos={tickets.filter((t) => t.uri)}
+        openId={open?.id ?? null}
+        onClose={() => setOpen(null)}
+        onRemove={remove}
+        label="Ticket"
+      />
     </View>
   );
 }
@@ -104,8 +97,4 @@ const styles = StyleSheet.create({
   hint: { fontSize: 14, color: colors.muted, marginTop: space.s, lineHeight: 20 },
   row: { gap: space.m, marginTop: space.m },
   thumb: { width: 72, height: 120, borderRadius: 8, backgroundColor: colors.bg },
-  viewer: { flex: 1, backgroundColor: '#000' },
-  full: { flex: 1 },
-  viewerBar: { flexDirection: 'row', justifyContent: 'space-between', padding: space.l },
-  viewerLink: { color: '#fff', fontSize: 17, fontWeight: '600', padding: space.s },
 });
