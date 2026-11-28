@@ -12,6 +12,7 @@ import type { Ticket, Trip } from '../domain/types';
 import { useAppData } from '../state/AppData';
 import { keepTicket } from '../storage/photos';
 import { newId } from '../storage/store';
+import { pdfPages } from '../tickets/PdfPages';
 import { readPdfTicket, readProblem, readTicket } from '../tickets/readTicket';
 
 /** True when the screenshot is about the trip we already have. */
@@ -42,8 +43,8 @@ export function ShareInbox() {
     if (!ready || !hasShareIntent) return;
     const files = shareIntent.files ?? [];
     const images = files.filter((f) => f.mimeType?.startsWith('image/'));
-    // A PDF fills in the trip from its own text. It isn't kept with the
-    // tickets, which are pictures that open at the gate without signal.
+    // A PDF fills in the trip from its own text, and its first pages are
+    // kept with the tickets as pictures, which open at the gate without signal.
     const pdfs = files.filter((f) => f.mimeType === 'application/pdf' || /\.pdf$/i.test(f.fileName ?? f.path ?? ''));
     resetShareIntent();
 
@@ -76,6 +77,11 @@ export function ShareInbox() {
       const details: TicketDetails = all[0] ?? readings[0]?.details ?? {};
       const problem = all.length > 0 ? undefined : readings.map(readProblem).find(Boolean);
       const text = readings.map((r) => r.text).filter(Boolean).join('\n\n—\n\n') || undefined;
+      // Each PDF's first pages, drawn as pictures and kept with the tickets
+      // (not read again: its own text was read above).
+      const pages: Ticket[] = [];
+      for (const f of pdfs) for (const uri of await pdfPages(f.path)) pages.push({ id: newId(), uri, addedAt: new Date().toISOString() });
+      const tickets = [...kept, ...pages];
       const detailsParam = JSON.stringify(all.length > 1 ? all : details);
 
       // The flight home for the current trip, on its own or in the whole
@@ -85,7 +91,7 @@ export function ShareInbox() {
       if (currentTrip?.flight && !currentTrip.returnFlight && (homeOnly || fullBooking)) {
         router.push({
           pathname: '/trip/edit',
-          params: { tickets: JSON.stringify(kept), details: detailsParam, ...(text && { text }) },
+          params: { tickets: JSON.stringify(tickets), details: detailsParam, ...(text && { text }) },
         });
         return;
       }
@@ -95,7 +101,7 @@ export function ShareInbox() {
       if (currentTrip && data.owners.length > 1 && joinsTrip(currentTrip, details)) {
         router.push({
           pathname: '/trip/edit',
-          params: { person: 'ask', tickets: JSON.stringify(kept), details: detailsParam, ...(text && { text }) },
+          params: { person: 'ask', tickets: JSON.stringify(tickets), details: detailsParam, ...(text && { text }) },
         });
         return;
       }
@@ -109,7 +115,7 @@ export function ShareInbox() {
           pathname: '/trip/edit',
           params: {
             new: '1',
-            tickets: JSON.stringify(kept),
+            tickets: JSON.stringify(tickets),
             details: detailsParam,
             ...(problem && { problem }),
             ...(text && { text }),
@@ -118,8 +124,8 @@ export function ShareInbox() {
         return;
       }
 
-      if (kept.length === 0) {
-        // Only PDFs. Nothing read from them: say why, rather than claim a match.
+      if (tickets.length === 0) {
+        // Only PDFs, and none could be drawn. Nothing read from them: say why, rather than claim a match.
         if (all.length === 0) {
           Alert.alert('No flight or hotel found', problem ?? "StashCall couldn't find a flight or hotel in that PDF. Share a screenshot of it instead.");
           return;
@@ -129,11 +135,11 @@ export function ShareInbox() {
         Alert.alert('Already in your trip', `That booking matches ${currentTrip.name}, so nothing needed changing.`);
         return;
       }
-      await update((d) => keepRefs(addTickets(d, currentTrip.id, kept), currentTrip.id, findBookingRefs(text), d.meId));
+      await update((d) => keepRefs(addTickets(d, currentTrip.id, tickets), currentTrip.id, findBookingRefs(text), d.meId));
       viewTrip(currentTrip.id);
       router.navigate('/trip');
       Alert.alert(
-        kept.length === 1 ? 'Ticket saved' : `${kept.length} tickets saved`,
+        tickets.length === 1 ? 'Ticket saved' : `${tickets.length} tickets saved`,
         `Kept with ${currentTrip.name}. It's on the Trip tab, and on Today too.`,
       );
     })();

@@ -83,7 +83,8 @@ export function mergeRefs(had: BookingRef[] = [], read: BookingRef[]): BookingRe
  * their own come first.
  */
 export function pnrFor(all: BookingRef[] | undefined, flightNumbers: string[], person?: string): string | undefined {
-  const refs = (all ?? []).filter((r) => !r.person || r.person === person);
+  // A phone that hasn't said whose it is can use any booking.
+  const refs = (all ?? []).filter((r) => !person || !r.person || r.person === person);
   if (refs.length === 0) return undefined;
   const on = refs.filter((r) => r.flights.some((f) => flightNumbers.includes(f)));
   const best = on.find((r) => r.person === person) ?? on[0];

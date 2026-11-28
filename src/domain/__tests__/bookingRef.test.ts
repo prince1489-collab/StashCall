@@ -105,3 +105,9 @@ describe('bookings per traveller', () => {
     expect(pnrFor(next, ['6E7415'], 'dad')).toBe('DAD222');
   });
 });
+
+describe('a phone with no person chosen', () => {
+  it('can use anyone’s booking', () => {
+    expect(pnrFor([{ pnr: 'MAH111', flights: ['6E7415'], person: 'me' }], ['6E7415'], undefined)).toBe('MAH111');
+  });
+});
