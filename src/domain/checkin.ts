@@ -62,3 +62,8 @@ export function journeyCheckIns(f: FlightLeg | undefined, home = false): CheckIn
     return [...byCode.values()];
   }
 }
+
+/** The app's own check-in screen for one check-in, named by its first flight. */
+export function checkInPath(tripId: string, flightNumber: string): string {
+  return `/checkin?trip=${encodeURIComponent(tripId)}&flight=${encodeURIComponent(flightNumber)}`;
+}

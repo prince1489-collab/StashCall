@@ -1,7 +1,10 @@
+import { router } from 'expo-router';
+import type { Href } from 'expo-router';
 import * as Notifications from 'expo-notifications';
 import { useEffect, useRef } from 'react';
 import { Linking } from 'react-native';
 
+import { checkInPath } from '../domain/checkin';
 import { tickAll } from '../domain/checklist';
 import { setPrep } from '../domain/prep';
 import { buildTimeline } from '../domain/timeline';
@@ -34,14 +37,19 @@ export function NotificationActions() {
         // A plain tap opens the app; reminders are sticky, so clear it too.
         if (actionIdentifier === Notifications.DEFAULT_ACTION_IDENTIFIER) {
           await Notifications.dismissNotificationAsync(request.identifier).catch(() => {});
-          // A check-in reminder opens the airline's website.
-          const url = (request.content.data as { url?: unknown } | undefined)?.url;
-          if (typeof url === 'string' && url.startsWith('https://')) {
-            const key = `${request.identifier}:open:${notification.date}`;
-            if (!handled.current.has(key)) {
-              handled.current.add(key);
-              await Linking.openURL(url).catch(() => {});
-            }
+          // A check-in reminder opens StashCall's check-in, which fills in the
+          // PNR on the airline's page. Older reminders open the website itself.
+          const { url, tripId, flight } = (request.content.data ?? {}) as { url?: unknown; tripId?: unknown; flight?: unknown };
+          const key = `${request.identifier}:open:${notification.date}`;
+          if (typeof url === 'string' && url.startsWith('https://') && !handled.current.has(key)) {
+            handled.current.add(key);
+            if (typeof tripId === 'string' && typeof flight === 'string') {
+              try {
+                router.push(checkInPath(tripId, flight) as Href);
+              } catch {
+                await Linking.openURL(url).catch(() => {});
+              }
+            } else await Linking.openURL(url).catch(() => {});
           }
         }
         return;

@@ -1,5 +1,6 @@
 import AsyncStorage from '@react-native-async-storage/async-storage';
 
+import type { CheckInDetails } from '../domain/bookingRef';
 import type { Place } from '../domain/places';
 import type { InsuranceCover, Item, LocalDate, Owner, Ticket, Trip } from '../domain/types';
 
@@ -26,6 +27,8 @@ export interface AppData {
   driverTemplates?: { toAirport?: string; fromAirport?: string };
   /** This phone's person's home, with its map pin, for rides to and from the airport. Not shared. */
   home?: Place;
+  /** Booking references and surname for filling in online check-in. On this phone only, never shared. */
+  checkIn?: CheckInDetails;
 }
 
 const KEY = 'stashcall:data';

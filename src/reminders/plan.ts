@@ -20,6 +20,8 @@ export interface PlannedReminder {
   hasItems: boolean;
   /** A page a tap opens, like the airline's check-in. */
   url?: string;
+  /** For a check-in: its first flight, which names StashCall's check-in screen for it. */
+  flight?: string;
 }
 
 /** "Check in for QP1111" when online check-in opens, a tap away from the airline. */
@@ -35,13 +37,13 @@ export function planCheckInReminders(trip: Trip, now: Date, meId?: string): Plan
       at: c.at,
       title: `Check in for ${listItems(c.flightNumbers)}`,
       body: `${c.airline} online check-in should be open now${c.home ? ' for your flight home' : ''}. ${
-        c.url ? 'Tap to open their website.' : 'Use their app or website.'
+        c.url ? 'Tap to check in: StashCall fills in your PNR.' : 'Use their app or website.'
       }`,
       kind: 'checkin' as const,
       critical: false,
       tripId: trip.id,
       hasItems: false,
-      ...(c.url && { url: c.url }),
+      ...(c.url && { url: c.url, flight: c.flightNumbers[0] }),
     }));
 }
 

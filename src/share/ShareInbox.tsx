@@ -4,6 +4,7 @@ import { useEffect } from 'react';
 import { Alert } from 'react-native';
 
 import { hasTripDetails, type TicketDetails } from '../domain/ticketParse';
+import { findBookingRefs, keepRefs } from '../domain/bookingRef';
 import { isReturnOf, joinsTrip } from '../domain/ticketDraft';
 import { addTickets } from '../domain/tickets';
 import { buildTimeline } from '../domain/timeline';
@@ -123,11 +124,12 @@ export function ShareInbox() {
           Alert.alert('No flight or hotel found', problem ?? "StashCall couldn't find a flight or hotel in that PDF. Share a screenshot of it instead.");
           return;
         }
-        // They match this trip as it is.
+        // They match this trip as it is. Keep their PNRs for check-in.
+        await update((d) => keepRefs(d, currentTrip.id, findBookingRefs(text)));
         Alert.alert('Already in your trip', `That booking matches ${currentTrip.name}, so nothing needed changing.`);
         return;
       }
-      await update((d) => addTickets(d, currentTrip.id, kept));
+      await update((d) => keepRefs(addTickets(d, currentTrip.id, kept), currentTrip.id, findBookingRefs(text)));
       viewTrip(currentTrip.id);
       router.navigate('/trip');
       Alert.alert(

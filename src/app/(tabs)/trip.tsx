@@ -4,7 +4,8 @@ import { Pressable, ScrollView, Share, StyleSheet, Text, View } from 'react-nati
 
 import { isGoing, travellers, tripFor } from '../../domain/people';
 import { tripChecklistText } from '../../domain/shareText';
-import { doneLabel, stepDone, toggleStep } from '../../domain/stepsDone';
+import { checkInPath } from '../../domain/checkin';
+import { doneLabel, stepDone, stepFlight, toggleStep } from '../../domain/stepsDone';
 import { buildTimeline } from '../../domain/timeline';
 import { journeyFlights } from '../../domain/journeys';
 import { formatTripDays, pastTrips, tripSpan, upcomingTrips } from '../../domain/trips';
@@ -252,7 +253,15 @@ function TripDetail({ trip }: { trip: Trip }) {
         steps={steps}
         now={now}
         itemsFor={(s) => stepItemNames(plan, data.items, s, data.owners)}
-        actionFor={isMe ? (s) => stepAction(s, steps, plan, data.driverTemplates, places) : undefined}
+        actionFor={
+          isMe
+            ? (s) =>
+                // Check-in opens inside StashCall, with the PNR and surname filled in.
+                s.kind === 'checkin' && s.link && stepFlight(s)
+                  ? { label: 'Check in', url: checkInPath(trip.id, stepFlight(s)!) }
+                  : stepAction(s, steps, plan, data.driverTemplates, places)
+            : undefined
+        }
         doneFor={(s) => {
           const d = stepDone(trip, planId, s, steps);
           return d ? doneLabel(d, data.owners, data.meId, deviceZone(), now) : undefined;
