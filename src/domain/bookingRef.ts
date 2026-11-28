@@ -206,10 +206,13 @@ export function surnameOn(text: string | null | undefined, firstName: string | u
   const first = firstName?.trim().split(/\s+/)[0];
   if (!text || !first || first.length < 2) return undefined;
   const esc = first.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
-  const m = new RegExp(`(?<![A-Za-z])${esc}\\s+([A-Za-z][A-Za-z'-]{1,})(?![A-Za-z])`, 'i').exec(text);
+  // Boarding passes print it surname first: "VERMA/ASHA".
+  const slash = new RegExp(`(?<![A-Za-z])([A-Za-z][A-Za-z'-]{1,})[ \\t]*\\/[ \\t]*${esc}(?![A-Za-z])`, 'i').exec(text);
+  // Otherwise the next word on the same line: a word on the next line may be another box.
+  const m = slash ?? new RegExp(`(?<![A-Za-z])${esc}[ \\t]+([A-Za-z][A-Za-z'-]{1,})(?![A-Za-z])`, 'i').exec(text);
   if (!m) return undefined;
   const last = m[1];
   // Labels that can follow a name in a table.
-  if (/^(?:mr|ms|mrs|adult|child|infant|male|female|economy|seat|gate|from|to)$/i.test(last)) return undefined;
+  if (/^(?:mr|ms|mrs|mstr|miss|adult|child|infant|male|female|economy|seat|gate|from|to|boarding|pass|flight|date)$/i.test(last)) return undefined;
   return last[0].toUpperCase() + last.slice(1).toLowerCase();
 }
