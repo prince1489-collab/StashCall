@@ -112,3 +112,10 @@ export function deleteAllPhotos(): void {
     if (dir.exists) dir.delete();
   }
 }
+
+/** Saves a picture made on the phone (a PDF page drawn as a JPEG) with the tickets. */
+export async function saveTicketImage(base64: string): Promise<string> {
+  const dest = new File(ticketDir(), `${Date.now().toString(36)}${Math.random().toString(36).slice(2, 6)}.jpg`);
+  await dest.write(base64, { encoding: 'base64' });
+  return dest.uri;
+}

@@ -8,6 +8,7 @@ import { ShareIntentProvider } from 'expo-share-intent';
 import { StatusBar } from 'expo-status-bar';
 
 import { NotificationActions } from '../reminders/NotificationActions';
+import { PdfPageRenderer } from '../tickets/PdfPages';
 import { RemindersProvider } from '../reminders/Reminders';
 import { configureNotifications } from '../reminders/schedule';
 import { ShareInbox } from '../share/ShareInbox';
@@ -35,6 +36,7 @@ export default function RootLayout() {
           <RemindersProvider>
             <NotificationActions />
             <ShareInbox />
+            <PdfPageRenderer />
             <LandingFiller />
             <StatusBar style="dark" />
             <Stack
